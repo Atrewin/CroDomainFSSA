@@ -129,7 +129,7 @@ class FewShotREFramework:
               adv_enc_lr=1e-1,
               use_sgd_for_bert=False):
         '''
-        model: a FewShotREModel instance
+        model: a FewShotREModel instance  #@jinhui 这里只是sentence_encoder
         model_name: Name of the model
         B: Batch size
         N: Num of classes for each batch
@@ -150,29 +150,37 @@ class FewShotREFramework:
         #     print(name)
         # exit()
 
+        # TODO optimizer_encoder
         if bert_optim:
             print('Use bert optim!')
-            parameters_to_optimize = list(model.named_parameters())
+            parameters_to_optimize = list(model.named_parameters())# 变量格式? tuple(name: str,param: contain)
+
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+            # @jinhui 疑问点: 这里为什么要这样设置leanable parameters weight_decay
             parameters_to_optimize = [
                 {'params': [p for n, p in parameters_to_optimize 
                     if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
                 {'params': [p for n, p in parameters_to_optimize
                     if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
+
+            # 优化器和参数绑定
             if use_sgd_for_bert:
                 optimizer = torch.optim.SGD(parameters_to_optimize, lr=learning_rate)
             else:
                 optimizer = AdamW(parameters_to_optimize, lr=learning_rate, correct_bias=False)
+
+            # @jinhui 疑惑:这里不会导致parameters_to_optimize和多个optimizer绑定吗?
             if self.adv:
                 optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)
+
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=train_iter)
         else:
             optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
 
             if self.adv:
-                not_upgrade_params = ["fc.weight", "fc.bias"]
-                for name, param in model.named_parameters():
+                not_upgrade_params = ["fc.weight", "fc.bias"]# 怎么知道这两参数不用更新的
+                for name, param in model.named_parameters():#指针对象?
                     if name in not_upgrade_params:
                         param.requires_grad = False
                     else:
@@ -214,14 +222,14 @@ class FewShotREFramework:
         for it in range(start_iter, start_iter + train_iter):
 
             support, query, label = next(self.train_data_loader)
-            if torch.cuda.is_available():
+            if torch.cuda.is_available():# @jinhui 疑惑 为什么要分开to cuda
                 for k in support:
                     support[k] = support[k].cuda()
                 for k in query:
                     query[k] = query[k].cuda()
                 label = label.cuda()
 
-            # 调用模型
+            # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
             logits, pred = model(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
 
             loss = model.loss(logits, label) / float(grad_iter)
@@ -234,13 +242,13 @@ class FewShotREFramework:
                 loss.backward()
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
             
-            if it % grad_iter == 0:
+            if it % grad_iter == 0:# @jinhui 貌似这个就是用来累计梯度的
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-
+            # @jinhui 疑惑: 感觉上面流程已经结束, 为什么还要对抗?
             if self.adv and it > pretrain_step:  # 对抗策略
-                support_adv = next(self.adv_data_loader)
+                support_adv = next(self.adv_data_loader) # 拿
                 if torch.cuda.is_available():
                     for k in support_adv:
                         support_adv[k] = support_adv[k].cuda()
@@ -249,16 +257,18 @@ class FewShotREFramework:
                 features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)
                 features_adv, _ = model.sentence_encoder(support_adv)
                 support_total = features_ori.size(0)
-                features = torch.cat([features_ori, features_adv], 0)
-                total = features.size(0)
+                features = torch.cat([features_ori, features_adv], 0)# 上下拼接
+                total = features.size(0)#
                 dis_labels = torch.cat([torch.zeros((total // 2)).long().cuda(),
                                         torch.ones((total // 2)).long().cuda()], 0)
+                # @jinhui 如果support_total 为基数会发生什么? 虽然这里way = 2 是不会发生的
                 sentiment_labels = torch.cat([torch.zeros((support_total // 2)).long().cuda(),
                                         torch.ones((support_total // 2)).long().cuda()], 0)
 
                 dis_logits = self.d(features)
                 sen_logits = self.sen_d(features_ori)
                 loss_dis = self.adv_cost(dis_logits, dis_labels)
+                # print(loss_dis) # tensor(0.7033, device='cuda:0', grad_fn=<NllLossBackward>)
                 sen_loss_dis = self.sen_cost(sen_logits, sentiment_labels)
                 _, pred = dis_logits.max(-1)
                 _, sen_pred = sen_logits.max(-1)
@@ -266,7 +276,7 @@ class FewShotREFramework:
                 sen_right_dis = float((sen_pred == sentiment_labels).long().sum()) / float(support_total)
 
                 loss_dis.backward(retain_graph=True)
-                optimizer_dis.step()
+                optimizer_dis.step()# 改变了模型参数, 导致后面的loss_encoder.backward 出现了 inplace operater
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()
@@ -277,11 +287,15 @@ class FewShotREFramework:
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
 
-                # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
-                loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)
 
-                loss_encoder.backward(retain_graph=True)
-                optimizer_encoder.step()
+                # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
+                dis_logits = self.d(features) # @jinhui
+                loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)# # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
+                # print(loss_encoder)# tensor(0.6985, device='cuda:0', grad_fn=<NllLossBackward>)
+                loss_encoder.backward(retain_graph=True)#torch 上面的loss_dis可以通过
+                # 可能的原因是，forward 和 backward前后有torch被inplace operarion 了
+                # .data 与 .detach()中可能在1.7版本中梯度的检查是不一样的
+                optimizer_encoder.step()# 现在这里还包含最开始的loss 梯度在, 不知道要不要改
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()

@@ -1,16 +1,16 @@
-from DAProtoNetModel.layers.data_loader import get_loader, get_loader_unsupervised
-from DAProtoNetModel.layers.framework import FewShotREFramework
-from DAProtoNetModel.layers.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder
-from DAProtoNetModel.layers.DAProtoNet import DAProtoNet
-from DAProtoNetModel.layers.d import Discriminator
-from DAProtoNetModel.layers.sen_d import Sen_Discriminator
+
 import torch
 from torch import optim
 import numpy as np
 import json
 import argparse
 import os
-
+from DAProtoNetModel.layers.data_loader import get_loader, get_loader_unsupervised
+from DAProtoNetModel.layers.framework import FewShotREFramework
+from DAProtoNetModel.layers.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder
+from DAProtoNetModel.layers.DAProtoNet import DAProtoNet
+from DAProtoNetModel.layers.d import Discriminator
+from DAProtoNetModel.layers.sen_d import Sen_Discriminator
 
 def main():
 
@@ -87,6 +87,10 @@ def main():
     elif encoder_name == 'bert':
         pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
         sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)
+    elif encoder_name == 'Roberta':
+        pretrain_ckpt = opt.pretrain_ckpt
+        filepath, tempfilename = os.path.split(pretrain_ckpt)
+        sentence_encoder =RobertaSentenceEncoder(filepath, tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
     else:
         raise NotImplementedError
 
@@ -108,7 +112,7 @@ def main():
 
     # 领域二分类器
     d = Discriminator(opt.hidden_size)
-    sen_D = Sen_Discriminator(opt.hidden_size)
+    sen_D = Sen_Discriminator(opt.hidden_size)# 是这里开始变慢了？
     framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader, adv_data_loader=adv_data_loader, adv=opt.adv, d=d, sen_d=sen_D)
         
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
@@ -122,7 +126,7 @@ def main():
     if len(opt.ckpt_name) > 0:
         prefix += '-' + opt.ckpt_name
 
-    #  构造模型
+    #  构造模型   @jinhui 将整个模型框架传入的设计会更加优雅
     model = DAProtoNet(sentence_encoder, opt.hidden_size, dot=opt.dot)
 
     if not os.path.exists('checkpoint'):
@@ -145,7 +149,7 @@ def main():
                 opt.lr = 2e-5
             else:
                 opt.lr = 1e-1
-
+        # @jinhui 这里的传参模式不符合面向对象程序设计思想, 建议作为属性成员传入framework
         framework.train(model, prefix, batch_size, trainN, N, K, Q, pretrain_step=opt.pretrain_step,
                 pytorch_optim=pytorch_optim, load_ckpt=opt.load_ckpt, save_ckpt=ckpt,
                 na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,

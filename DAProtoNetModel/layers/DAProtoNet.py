@@ -10,7 +10,7 @@ from torch.nn import functional as F
 
 
 class DAProtoNet(framework.FewShotREModel):
-
+    # 类似于
     def __init__(self, sentence_encoder, hidden_size, dot=False):
         framework.FewShotREModel.__init__(self, sentence_encoder, hidden_size)
         # self.fc = nn.Linear(hidden_size, hidden_size)

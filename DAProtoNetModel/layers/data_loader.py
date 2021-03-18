@@ -9,6 +9,7 @@ import json
 class FewRelDataset(data.Dataset):
     """
     FewRel Dataset
+    return
     """
     def __init__(self, name, encoder, N, K, Q, na_rate, root):
         self.root = root
@@ -16,13 +17,13 @@ class FewRelDataset(data.Dataset):
         if not os.path.exists(path):
             print("[ERROR] Data file does not exist!")
             assert(0)
-        self.json_data = json.load(open(path, encoding="utf-8"))
+        self.json_data = json.load(open(path, encoding='utf-8'))# ok
         self.classes = list(self.json_data.keys())
         self.N = N
         self.K = K
         self.Q = Q
-        self.na_rate = na_rate
-        self.encoder = encoder
+        self.na_rate = na_rate# unknow
+        self.encoder = encoder# @jinhui 用来index id 化
 
     def __getraw__(self, item):
         word = self.encoder.tokenize(item['tokens'])  # 单词下标化
@@ -81,7 +82,8 @@ def collate_fn(data):
 
 def get_loader(name, encoder, N, K, Q, batch_size, 
         num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data'):
-    dataset = FewRelDataset(name, encoder, N, K, Q, na_rate, root)
+    dataset = FewRelDataset(name, encoder, N, K, Q, na_rate, root)#已经ID化
+    temp = dataset[0]# 参看数据format
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,
             shuffle=False,
@@ -219,7 +221,8 @@ class FewRelUnsupervisedDataset(data.Dataset):
         if not os.path.exists(path):
             print("[ERROR] Data file does not exist!")
             assert(0)
-        self.json_data = json.load(open(path))
+        # self.json_data = json.load(open(path, encoding='utf-8'))# no self.json_data = json.load(open(path, encoding='utf-8'))
+        self.json_data = json.load(open(path, encoding='utf-8'), encoding='utf-8')
         self.N = N
         self.K = K
         self.Q = Q

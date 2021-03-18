@@ -3,25 +3,24 @@ from os.path import normpath,join,dirname
 # 先引入根目录路径，以后的导入将直接使用当前项目的绝对路径
 sys.path.append(normpath(join(dirname(__file__), '..')))
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import math
 import numpy as np
 import os
 from torch import optim
 from . import network
-from DAProtoNetModel.layers.network.CNNEncoder import cnnEncoder
 from transformers import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification, RobertaModel, RobertaTokenizer, RobertaForSequenceClassification
-
+import torch.nn as nn
+from DAProtoNetModel.layers.network.CNNEncoder import cnnEncoder
 
 class CNNSentenceEncoder(nn.Module):
 
-    def __init__(self, word_vec_mat, word2id, max_length, word_embedding_dim=50, 
+    def __init__(self, word_vec_mat, word2id, max_length, word_embedding_dim=50,
             pos_embedding_dim=5, hidden_size=230):
         nn.Module.__init__(self)
         self.hidden_size = hidden_size
         self.max_length = max_length
-        self.embedding = network.embedding.Embedding(word_vec_mat, max_length, 
+        self.embedding = network.embedding.Embedding(word_vec_mat, max_length,
                 word_embedding_dim, pos_embedding_dim)
         self.in_encoder = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域不变特征
         self.sp_encoder = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域特定特征
@@ -63,6 +62,7 @@ class BERTSentenceEncoder(nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.cat_entity_rep = cat_entity_rep
         self.mask_entity = mask_entity
+
         self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
         self.sp_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
         # self.drop = nn.Dropout(0.2)
@@ -124,99 +124,47 @@ class BERTPAIRSentenceEncoder(nn.Module):
 
 class RobertaSentenceEncoder(nn.Module):
 
-    def __init__(self, pretrain_path, max_length, cat_entity_rep=False): 
+    def __init__(self, pretrain_path,checkpoint_name, max_length, cat_entity_rep=False):
         nn.Module.__init__(self)
-        self.roberta = RobertaModel.from_pretrained(pretrain_path)
+        # 也可以考虑直接取Bert CSL 和SLP的方案
+        from fairseq.models.roberta import RobertaModel
+        self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+        self.sp_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+
         self.max_length = max_length
-        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        # self.tokenizer = 直接只用in_roberta内置的方法 具体查看fairseq 的接口
         self.cat_entity_rep = cat_entity_rep
 
+        # 后面的Bert特征怎么取到的问题
+        # CNN的方案 如果不用那么就没必要增加GPU负担
+        # self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
+        # self.sp_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
+
+
     def forward(self, inputs):
-        if not self.cat_entity_rep:
-            _, x = self.roberta(inputs['word'], attention_mask=inputs['mask'])
-            return x
-        else:
-            outputs = self.roberta(inputs['word'], attention_mask=inputs['mask'])
-            tensor_range = torch.arange(inputs['word'].size()[0])
-            h_state = outputs[0][tensor_range, inputs["pos1"]]
-            t_state = outputs[0][tensor_range, inputs["pos2"]]
-            state = torch.cat((h_state, t_state), -1)
-            return state
 
-    def tokenize(self, raw_tokens, pos_head, pos_tail):
-        def getIns(bped, bpeTokens, tokens, L):
-            resL = 0
-            tkL = " ".join(tokens[:L])
-            bped_tkL = " ".join(self.tokenizer.tokenize(tkL))
-            if bped.find(bped_tkL) == 0:
-                resL = len(bped_tkL.split())
-            else:
-                tkL += " "
-                bped_tkL = " ".join(self.tokenizer.tokenize(tkL))
-                if bped.find(bped_tkL) == 0:
-                    resL = len(bped_tkL.split())
-                else:
-                    raise Exception("Cannot locate the position")
-            return resL
+        in_x = self.in_roberta.extract_features(inputs['word'])#B, N ,D
 
-        s = " ".join(raw_tokens)
-        sst = self.tokenizer.tokenize(s)
-        headL = pos_head[0]
-        headR = pos_head[-1] + 1
-        hiL = getIns(" ".join(sst), sst, raw_tokens, headL)
-        hiR = getIns(" ".join(sst), sst, raw_tokens, headR)
+        sp_x = self.sp_roberta.extract_features(inputs['word'])
 
-        tailL = pos_tail[0]
-        tailR = pos_tail[-1] + 1
-        tiL = getIns(" ".join(sst), sst, raw_tokens, tailL)
-        tiR = getIns(" ".join(sst), sst, raw_tokens, tailR)
+        # 方式二
+        return in_x[:,1,:], sp_x[:,1,:]
 
-        E1b = 'madeupword0000'
-        E1e = 'madeupword0001'
-        E2b = 'madeupword0002'
-        E2e = 'madeupword0003'
-        ins = [(hiL, E1b), (hiR, E1e), (tiL, E2b), (tiR, E2e)]
-        ins = sorted(ins)
-        pE1 = 0
-        pE2 = 0
-        pE1_ = 0
-        pE2_ = 0
-        for i in range(0, 4):
-            sst.insert(ins[i][0] + i, ins[i][1])
-            if ins[i][1] == E1b:
-                pE1 = ins[i][0] + i
-            elif ins[i][1] == E2b:
-                pE2 = ins[i][0] + i
-            elif ins[i][1] == E1e:
-                pE1_ = ins[i][0] + i
-            else:
-                pE2_ = ins[i][0] + i
-        pos1_in_index = pE1 + 1
-        pos2_in_index = pE2 + 1
-        sst = ['<s>'] + sst
-        indexed_tokens = self.tokenizer.convert_tokens_to_ids(sst)
+    def tokenize(self, raw_tokens):
+        # token -> index #查看到raw_tokens本身有CLS
+
+        tokens = 'CLS'
+        for token in raw_tokens:
+            tokens += " " + token
+        indexed_tokens = self.in_roberta.encode(tokens).tolist()
+
 
         # padding
         while len(indexed_tokens) < self.max_length:
-            indexed_tokens.append(1)
+            indexed_tokens.append(2)#该用什么填充呢？
         indexed_tokens = indexed_tokens[:self.max_length]
 
-        # pos
-        pos1 = np.zeros((self.max_length), dtype=np.int32)
-        pos2 = np.zeros((self.max_length), dtype=np.int32)
-        for i in range(self.max_length):
-            pos1[i] = i - pos1_in_index + self.max_length
-            pos2[i] = i - pos2_in_index + self.max_length
-
-        # mask
-        mask = np.zeros((self.max_length), dtype=np.int32)
-        mask[:len(sst)] = 1
-
-        pos1_in_index = min(self.max_length, pos1_in_index)
-        pos2_in_index = min(self.max_length, pos2_in_index)
-
-        return indexed_tokens, pos1_in_index - 1, pos2_in_index - 1, mask
-
+        return indexed_tokens
 
 class RobertaPAIRSentenceEncoder(nn.Module):
 

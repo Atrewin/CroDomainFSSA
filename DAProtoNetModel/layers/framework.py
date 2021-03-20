@@ -24,14 +24,14 @@ class FewShotREModel(nn.Module):
     def __init__(self, sentence_encoder, hidden_size):
         '''
         sentence_encoder: Sentence encoder
-        
+
         You need to set self.cost as your own loss function.
         '''
         nn.Module.__init__(self)
         self.sentence_encoder = nn.DataParallel(sentence_encoder)
         self.hidden_size = hidden_size
         self.cost = nn.CrossEntropyLoss()
-    
+
     def forward(self, support, query, N, K, Q):
         '''
         support: Inputs of the support set.
@@ -46,7 +46,7 @@ class FewShotREModel(nn.Module):
     def loss(self, logits, label):
         '''
         logits: Logits with the size (..., class_num)
-        label: Label with whatever size. 
+        label: Label with whatever size.
         return: [Loss] (A single value)
         '''
         N = logits.size(-1)
@@ -63,7 +63,8 @@ class FewShotREModel(nn.Module):
 
 class FewShotREFramework:
 
-    def __init__(self, train_data_loader, val_data_loader, test_data_loader, adv_data_loader=None, adv=False, d=None, sen_d=None):
+    def __init__(self, train_data_loader, val_data_loader, test_data_loader, adv_data_loader=None, adv=False, d=None,
+                 sen_d=None):
         '''
         train_data_loader: DataLoader for training.
         val_data_loader: DataLoader for validating.
@@ -81,7 +82,7 @@ class FewShotREFramework:
             self.d.cuda()
             self.sen_d = sen_d
             self.sen_d.cuda()
-    
+
     def __load_model__(self, ckpt):
         '''
         ckpt: Path of the checkpoint
@@ -93,7 +94,7 @@ class FewShotREFramework:
             return checkpoint
         else:
             raise Exception("No checkpoint found at '%s'" % ckpt)
-    
+
     def item(self, x):
         '''
         PyTorch before and after 0.4
@@ -153,15 +154,15 @@ class FewShotREFramework:
         # TODO optimizer_encoder
         if bert_optim:
             print('Use bert optim!')
-            parameters_to_optimize = list(model.named_parameters())# 变量格式? tuple(name: str,param: contain)
+            parameters_to_optimize = list(model.named_parameters())  # 变量格式? tuple(name: str,param: contain)
 
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             # @jinhui 疑问点: 这里为什么要这样设置leanable parameters weight_decay
             parameters_to_optimize = [
-                {'params': [p for n, p in parameters_to_optimize 
-                    if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
                 {'params': [p for n, p in parameters_to_optimize
-                    if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+                            if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+                {'params': [p for n, p in parameters_to_optimize
+                            if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
 
             # 优化器和参数绑定
@@ -174,13 +175,14 @@ class FewShotREFramework:
             if self.adv:
                 optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)
 
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=train_iter)
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
+                                                        num_training_steps=train_iter)
         else:
             optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
 
             if self.adv:
-                not_upgrade_params = ["fc.weight", "fc.bias"]# 怎么知道这两参数不用更新的
-                for name, param in model.named_parameters():#指针对象?
+                not_upgrade_params = ["fc.weight", "fc.bias"]  # 怎么知道这两参数不用更新的
+                for name, param in model.named_parameters():  # 指针对象?
                     if name in not_upgrade_params:
                         param.requires_grad = False
                     else:
@@ -222,7 +224,7 @@ class FewShotREFramework:
         for it in range(start_iter, start_iter + train_iter):
 
             support, query, label = next(self.train_data_loader)
-            if torch.cuda.is_available():# @jinhui 疑惑 为什么要分开to cuda
+            if torch.cuda.is_available():  # @jinhui 疑惑 为什么要分开to cuda
                 for k in support:
                     support[k] = support[k].cuda()
                 for k in query:
@@ -241,14 +243,14 @@ class FewShotREFramework:
             else:
                 loss.backward()
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
-            
-            if it % grad_iter == 0:# @jinhui 貌似这个就是用来累计梯度的
+
+            if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
             # @jinhui 疑惑: 感觉上面流程已经结束, 为什么还要对抗?
             if self.adv and it > pretrain_step:  # 对抗策略
-                support_adv = next(self.adv_data_loader) # 拿
+                support_adv = next(self.adv_data_loader)  # 拿
                 if torch.cuda.is_available():
                     for k in support_adv:
                         support_adv[k] = support_adv[k].cuda()
@@ -257,13 +259,13 @@ class FewShotREFramework:
                 features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)
                 features_adv, _ = model.sentence_encoder(support_adv)
                 support_total = features_ori.size(0)
-                features = torch.cat([features_ori, features_adv], 0)# 上下拼接
-                total = features.size(0)#
+                features = torch.cat([features_ori, features_adv], 0)  # 上下拼接
+                total = features.size(0)  #
                 dis_labels = torch.cat([torch.zeros((total // 2)).long().cuda(),
                                         torch.ones((total // 2)).long().cuda()], 0)
                 # @jinhui 如果support_total 为基数会发生什么? 虽然这里way = 2 是不会发生的
                 sentiment_labels = torch.cat([torch.zeros((support_total // 2)).long().cuda(),
-                                        torch.ones((support_total // 2)).long().cuda()], 0)
+                                              torch.ones((support_total // 2)).long().cuda()], 0)
 
                 dis_logits = self.d(features)
                 sen_logits = self.sen_d(features_ori)
@@ -276,7 +278,7 @@ class FewShotREFramework:
                 sen_right_dis = float((sen_pred == sentiment_labels).long().sum()) / float(support_total)
 
                 loss_dis.backward(retain_graph=True)
-                optimizer_dis.step()# 改变了模型参数, 导致后面的loss_encoder.backward 出现了 inplace operater
+                optimizer_dis.step()  # 改变了模型参数, 导致后面的loss_encoder.backward 出现了 inplace operater
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()
@@ -287,15 +289,14 @@ class FewShotREFramework:
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
 
-
                 # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
-                dis_logits = self.d(features) # @jinhui
-                loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)# # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
+                dis_logits = self.d(features)  # @jinhui
+                loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)  # # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
                 # print(loss_encoder)# tensor(0.6985, device='cuda:0', grad_fn=<NllLossBackward>)
-                loss_encoder.backward(retain_graph=True)#torch 上面的loss_dis可以通过
+                loss_encoder.backward(retain_graph=True)  # torch 上面的loss_dis可以通过
                 # 可能的原因是，forward 和 backward前后有torch被inplace operarion 了
                 # .data 与 .detach()中可能在1.7版本中梯度的检查是不一样的
-                optimizer_encoder.step()# 现在这里还包含最开始的loss 梯度在, 不知道要不要改
+                optimizer_encoder.step()  # 现在这里还包含最开始的loss 梯度在, 不知道要不要改
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()
@@ -309,19 +310,22 @@ class FewShotREFramework:
             iter_sample += 1
 
             if self.adv:
-                sys.stdout.write('step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_acc: {5:2.6f}'
+                sys.stdout.write(
+                    'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_acc: {5:2.6f}'
                     .format(it + 1, iter_loss / iter_sample,
-                        100 * iter_right / iter_sample,
-                        iter_loss_dis / iter_sample,
-                        100 * iter_right_dis / iter_sample,
-                        100 * iter_sen_right_dis / iter_sample) + '\r')
+                            100 * iter_right / iter_sample,
+                            iter_loss_dis / iter_sample,
+                            100 * iter_right_dis / iter_sample,
+                            100 * iter_sen_right_dis / iter_sample) + '\r')
             else:
-                sys.stdout.write('step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%'.format(it + 1, iter_loss / iter_sample, 100 * iter_right / iter_sample) + '\r')
+                sys.stdout.write(
+                    'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%'.format(it + 1, iter_loss / iter_sample,
+                                                                               100 * iter_right / iter_sample) + '\r')
             sys.stdout.flush()
 
             if (it + 1) % val_step == 0:
-                acc = self.eval(model, B, N_for_eval, K, Q, val_iter, 
-                        na_rate=na_rate)
+                acc = self.eval(model, B, N_for_eval, K, Q, val_iter,
+                                na_rate=na_rate)
                 model.train()
                 if acc > best_acc:
                     print('Best checkpoint')
@@ -337,11 +341,11 @@ class FewShotREFramework:
         print("Finish training " + model_name)
 
     def eval(self,
-            model,
-            B, N, K, Q,
-            eval_iter,
-            na_rate=0,
-            ckpt=None):
+             model,
+             B, N, K, Q,
+             eval_iter,
+             na_rate=0,
+             ckpt=None):
         '''
         model: a FewShotREModel instance
         B: Batch size
@@ -353,7 +357,7 @@ class FewShotREFramework:
         return: Accuracy
         '''
         print("")
-        
+
         model.eval()
         if ckpt is None:
             print("Use val dataset")
@@ -386,7 +390,8 @@ class FewShotREFramework:
                 iter_right += self.item(right.data)
                 iter_sample += 1
 
-                sys.stdout.write('[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
+                sys.stdout.write(
+                    '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
                 sys.stdout.flush()
             print("")
         return iter_right / iter_sample

@@ -87,10 +87,10 @@ def main():
     elif encoder_name == 'bert':
         pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
         sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)
-    elif encoder_name == 'Roberta':
+    elif encoder_name == 'roberta':
         pretrain_ckpt = opt.pretrain_ckpt
         filepath, tempfilename = os.path.split(pretrain_ckpt)
-        sentence_encoder =RobertaSentenceEncoder(filepath, tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
+        sentence_encoder =RobertaSentenceEncoder(filepath,tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
     else:
         raise NotImplementedError
 
@@ -136,7 +136,7 @@ def main():
         ckpt = opt.save_ckpt
 
     if torch.cuda.is_available():
-        model.cuda()
+        model.cuda()# 疑问 这一句有成功tocuda吗？
 
     if not opt.only_test:
         if encoder_name in ['bert', 'roberta']:

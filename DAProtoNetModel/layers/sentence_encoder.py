@@ -140,15 +140,30 @@ class RobertaSentenceEncoder(nn.Module):
         # self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
         # self.sp_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
 
+        # 调用分类器来获得语义信息方案
+        # embedding_size = 768
+        # self.in_roberta.register_classification_head('emb_sentence', num_classes=embedding_size)
+        # self.sp_roberta.register_classification_head('emb_sentence', num_classes=embedding_size)
+
 
     def forward(self, inputs):
 
-        in_x = self.in_roberta.extract_features(inputs['word'])#B, N ,D
-
+        # ## 方式一 使用CNN
+        # word_embed = self.in_roberta.extract_features(inputs['word'])#@jinhui 疑问：有没有办法可以限制它的更新？
+        # # word_embed = self.drop(word_embed)
+        # in_x = self.in_cnn_encoder(word_embed)
+        # sp_x = self.sp_cnn_encoder(word_embed)
+        #
+        # return in_x, sp_x
+        # # 方式二
+        in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
         sp_x = self.sp_roberta.extract_features(inputs['word'])
-
-        # 方式二
         return in_x[:,1,:], sp_x[:,1,:]
+
+        # # 方案三 调用分类器
+        # in_x = self.in_roberta.predict('emb_sentence',inputs['word'])#B, D
+        # sp_x = self.sp_roberta.predict('emb_sentence', inputs['word'])
+        # return  in_x, sp_x # 4,768
 
     def tokenize(self, raw_tokens):
         # token -> index #查看到raw_tokens本身有CLS

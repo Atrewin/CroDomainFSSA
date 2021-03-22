@@ -3,13 +3,14 @@ import torch
 import traceback
 
 def exampel():
-    # roberta = torch.hub.load('pytorch/fairseq', 'roberta.large')
-    # roberta.eval()  # disable dropout (or leave in train mode to finetune)
     import torch
-    # Load the model in fairseq file #@jinhui 会重新修改开源文件
-    from fairseq.models.roberta import RobertaModel
-    roberta = RobertaModel.from_pretrained('./pre-train/roberta.large', checkpoint_file='model.pt')
+    roberta = torch.hub.load('pytorch/fairseq', 'roberta.large')
     roberta.eval()  # disable dropout (or leave in train mode to finetune)
+
+    # Load the model in fairseq file #@jinhui 会重新修改开源文件
+    # from fairseq.models.roberta import RobertaModel
+    # roberta = RobertaModel.from_pretrained('./pre-train/roberta.large', checkpoint_file='model.pt')
+    # roberta.eval()  # disable dropout (or leave in train mode to finetune)
 
     # TODO 基础操作
     tokens = roberta.encode('Hello world!')
@@ -108,33 +109,64 @@ def exampel():
 # TODO 读取一个SC问题的模型，看看他能不能做MASK问题
 # 原本的能，但是自己的好像不太可以 @jinhui 0315 应该需要在MASK 上面增加head, 再做sc问题
 # 还是会被去掉，需要看一下mnli是如何保持head来finetuning的 估计是保存的方式不同
+def DSP():
+    roberta = RobertaModel.from_pretrained(checkPath1, checkpoint_file='checkpoint1.pt')
+    roberta.eval()  # disable dropout (or leave in train mode to finetune)
 
+    # Encode a pair of sentences and make a prediction
+    tokens = roberta.encode(pairSentence1)
+    a1 = roberta.predict('dsp_head', tokens).argmax()  # 1
+
+    # Encode another pair of sentences
+    tokens = roberta.encode(pairSentence2)
+    a2 = roberta.predict('dsp_head', tokens).argmax()  # 0
 import torch
 # Load the model in fairseq file #@jinhui 会重新修改开源文件
 from fairseq.models.roberta import RobertaModel
-checkPath1 = "/home/cike/project/fairseq/extension/RoBERT/pre-train/checkpoints"
-checkPath2 = "/home/cike/project/fairseq/fairseq_cli/checkpoints/checkpoint1.pt"
+checkPath1 = "/home/cike/project/fairseq/extension/RoBERT/pre-train/checkpoints/MASK_book2kitchen"
+checkPath2 = "/home/cike/project/fairseq/fairseq_cli/checkpoints"
 # label = 1
 pairSentence1 = "CLS I bought this DVD because I really adore the Strokes Good music good people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE I bought this DVD because I really adore the Strokes Good music good people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE"
 # label = 0
 pairSentence2 = "CLS Since Eve took the first bite of the apple from the tree of knowledge truth in its purity has become a weapon through distortions and promises costing those seeking promised peace great expense and in some cases even the highest prices of all  the lives of our loved ones Anyone who is seeking truth  not just a quick fix or a patch job  will find Dr Patten's book Truth Knowledge or Just Plain Bull a valuable tool in their arsenal of discernment as we are constantly being bombarded with lies and promises to fix your every woe if you will just buy this product belong to this church or political party follow this guideline live here or there etc It is not a book for the faint of heart because I found myself caught in many of the traps hoping to find truth and the peace it promises in so many of the wrong ideas feelings places and products From what I understand from Patten the search for truth is an honorable one Truth does exist But truth is free and its fruit is peace  Not war anarchy chaos hatred or distain for others Hard to imagine something so valuable costing nothing and you don`t even have to drink Jones' Kool-Aid  The issue raised is the cost of trust was a heavy one  it is just that the bill has already been paid in full almost 2000 years ago SPE My brother is Cameron Fry and it wasn't until his first year in college that he found his Ferris Bueller This is a classic that every high school student should see It's a great way to appreciate life and the parade scene is one of the best It's easy to tell from this film that Matthew Broderick was destined to be a star SPE"
 
-roberta = RobertaModel.from_pretrained(checkPath2, checkpoint_file='checkpoint1.pt')
-roberta.eval()  # disable dropout (or leave in train mode to finetune)
-
-# Encode a pair of sentences and make a prediction
-tokens = roberta.encode(pairSentence1)
-a1 = roberta.predict('dsp_head', tokens).argmax()  # 1
-
-# Encode another pair of sentences
-tokens = roberta.encode(pairSentence2)
-a2 = roberta.predict('dsp_head', tokens).argmax()  # 0
-
 
 # fill task
-roberta_mask = RobertaModel.from_pretrained(checkPath1, checkpoint_file='checkpoint1.pt')
-a3 = roberta.fill_mask('The first Start wars movie came out in <mask>', topk=3)
+# 读到模型
+roberta_mask = RobertaModel.from_pretrained(checkPath1, checkpoint_file='checkpoint_best.pt')
+
+a3 = roberta_mask.fill_mask('The first Start wars movie came out in <mask>', topk=3)
+
+pairSentence1 = "CLS I bought this DVD because I really adore the Strokes Good music good people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE I bought this DVD because I really adore the Strokes Good music good people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE"
+
+test1 = "CLS I bought this DVD because I really adore the Strokes Good music <mask> people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE I bought this DVD because I really adore the Strokes Good music good people good style not so good documentary Whoever made this video should not make anymore at all The strokes were not even in this besides very few pictures & 10 second clips of them & the exclusive interviews were not that exclusive No sound from any of the strokes & no interviews with them I can go on I mean c'mon a documentary of the Strokes should at least have the Strokes in it right SPE"
+
+pairSentence2 = "CLS Since Eve took the first bite of the apple from the tree of knowledge truth in its purity has become a weapon through distortions and promises costing those seeking promised peace great expense and in some cases even the highest prices of all  the lives of our loved ones Anyone who is seeking truth  not just a quick fix or a patch job  will find Dr Patten's book Truth Knowledge or Just Plain Bull a valuable tool in their arsenal of discernment as we are constantly being bombarded with lies and promises to fix your every woe if you will just buy this product belong to this church or political party follow this guideline live here or there etc It is not a book for the faint of heart because I found myself caught in many of the traps hoping to find truth and the peace it promises in so many of the wrong ideas feelings places and products From what I understand from Patten the search for truth is an honorable one Truth does exist But truth is free and its fruit is peace  Not war anarchy chaos hatred or distain for others Hard to imagine something so valuable costing nothing and you don`t even have to drink Jones' Kool-Aid  The issue raised is the cost of trust was a heavy one  it is just that the bill has already been paid in full almost 2000 years ago SPE My brother is Cameron Fry and it wasn't until his first year in college that he found his Ferris Bueller This is a classic that every high school student should see It's a great way to appreciate life and the parade scene is one of the best It's easy to tell from this film that Matthew Broderick was destined to be a star SPE"
+
+test2 = "CLS Since Eve took the first bite of the <mask> from the tree of knowledge truth in its purity has become a weapon through distortions and promises costing those seeking promised peace great expense and in some cases even the highest prices of all  the lives of our loved ones Anyone who is seeking truth  not just a quick fix or a patch job  will find Dr Patten's book Truth Knowledge or Just Plain Bull a valuable tool in their arsenal of discernment as we are constantly being bombarded with lies and promises to fix your every woe if you will just buy this product belong to this church or political party follow this guideline live here or there etc It is not a book for the faint of heart because I found myself caught in many of the traps hoping to find truth and the peace it promises in so many of the wrong ideas feelings places and products From what I understand from Patten the search for truth is an honorable one Truth does exist But truth is free and its fruit is peace  Not war anarchy chaos hatred or distain for others Hard to imagine something so valuable costing nothing and you don`t even have to drink Jones' Kool-Aid  The issue raised is the cost of trust was a heavy one  it is just that the bill has already been paid in full almost 2000 years ago SPE My brother is Cameron Fry and it wasn't until his first year in college that he found his Ferris Bueller This is a classic that every high school student should see It's a great way to appreciate life and the parade scene is one of the best It's easy to tell from this film that Matthew Broderick was destined to be a star SPE"
+
+sentence1 = "CLS This is the perfect gift for the comic book fan who has every comic book Also looks great on a coffee table"
+test1 = "CLS This is the  <mask> gift for the comic book fan who has every comic book Also looks great on a coffee table"
+test2 = "CLS This is the perfect gift for the comic book fan who has every comic book Also looks <mask> on a coffee table"
+
+sentence2 = "The book looks good"
+test3 = "The book looks <mask>"
+
+sentence3 = "CLS The scene in the outdoor cafe is delicious and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date SPE The scene in the outdoor cafe is delicious and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date SPE"
+sentence3 = "CLS The scene in the outdoor cafe is delicious and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date"
+test4 = "CLS The scene in the outdoor cafe is <mask> and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date SPE The scene in the outdoor cafe is delicious and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date SPE"
+
+sentence3_1 = "CLS The scene in the outdoor cafe is delicious and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date"
+test4_1 = "CLS The scene in the outdoor cafe is <mask> and the scene in the fountain is now a standard  see Boxing Helena  Fellini hit the big-time with this movie and helped develop the future of film A classic - never goes out of date"
+
+sentence4 = "Works great!  Makes small amounts of delicious coffee!  Very handy"
+test5 = "Works great!  Makes small amounts of <mask> coffee!  Very handy"
 
 
-
-
+answer1 = roberta_mask.fill_mask(test1, topk=5) #
+answer2 = roberta_mask.fill_mask(test2, topk=5) #
+answer3 = roberta_mask.fill_mask(test3, topk=5) #
+answer4 = roberta_mask.fill_mask(test4, topk=5) #
+answer5 = roberta_mask.fill_mask(test5, topk=5) #
+answer4_1 = roberta_mask.fill_mask(test4_1, topk=5)
+print("  ")

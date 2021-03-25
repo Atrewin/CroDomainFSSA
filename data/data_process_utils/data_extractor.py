@@ -119,7 +119,7 @@ def main():
     # 文本预处理
     pos_reviews = sent_process(pos_reviews)
     neg_reviews = sent_process(neg_reviews)
-    unlabel_reviews = sent_process(unlabeled_reviews)
+    unlabeled_reviews = sent_process(unlabeled_reviews)
 
     # 将reviews转换成json结构
     json_data = reviews2json(pos_reviews, neg_reviews)

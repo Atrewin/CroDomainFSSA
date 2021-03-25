@@ -61,9 +61,89 @@ class FewRelDataset(data.Dataset):
         return 1000000000
 
 
+class FewGraphDataset(data.Dataset):
+    """
+    FewRel Dataset add Graph feature
+    return
+    """
+
+    def __init__(self, name, encoder, N, K, Q, na_rate, root):
+        self.root = root
+        path = os.path.join(root, name + ".json")
+        if not os.path.exists(path):
+            print("[ERROR] Data file does not exist!")
+            assert (0)
+        self.json_data = json.load(open(path, encoding='utf-8'))  # ok
+
+        name = name.split("_")[0]
+        path = os.path.join(root, 'graph_features/sf_' + name + '_small_5000.np')
+        if not os.path.exists(path):
+            print("[ERROR] Data file does not exist!")
+            assert (0)
+        self.graph_feature = self.load_graphFeature(path)
+        self.classes = list(self.json_data.keys())
+        self.N = N
+        self.K = K
+        self.Q = Q
+        self.na_rate = na_rate  # unknow
+        self.encoder = encoder  # @jinhui 用来index id 化
+
+    def __getraw__(self, item):
+        word = self.encoder.tokenize(item['tokens'])  # 单词下标化
+        return word
+
+    def __additem__(self, d, word, graphFeature):
+        d['word'].append(word)
+        d["graphFeature"].append(graphFeature)
+
+    def __getitem__(self, index):
+        target_classes = ["neg", "pos"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
+        support_set = {'word': [], "graphFeature":[]}
+        query_set = {'word': [], "graphFeature":[]}
+        query_label = []
+
+        for i, class_name in enumerate(target_classes):
+            indices = np.random.choice(
+                list(range(len(self.json_data[class_name]))),
+                self.K + self.Q, False)
+            count = 0
+            for j in indices:# 如数据是进行了"neg", "pos"和并的
+                word = self.__getraw__(
+                    self.json_data[class_name][j])
+                word = torch.tensor(word).long()
+
+                if class_name == "pos":
+                    graphFeature = self.graph_feature[j]
+                else:
+                    graphFeature = self.graph_feature[j+1000]#因为两个文件的数据组织差异导致的
+
+                graphFeature = torch.tensor(graphFeature).type(torch.FloatTensor)
+
+
+                if count < self.K:
+                    self.__additem__(support_set, word, graphFeature)
+                else:
+                    self.__additem__(query_set, word, graphFeature)
+                count += 1
+
+            query_label += [i] * self.Q
+
+        return support_set, query_set, query_label
+
+    def __len__(self):
+        return 1000000000
+
+    def load_graphFeature(self, path):
+
+
+        X_s_ = np.load(open(path, 'rb'), allow_pickle=True)
+
+        return X_s_
+
+
 def collate_fn(data):
-    batch_support = {'word': []}
-    batch_query = {'word': []}
+    batch_support = {'word': [], "graphFeature":[]}
+    batch_query = {'word': [], "graphFeature":[]}
     batch_label = []
     support_sets, query_sets, query_labels = zip(*data)
     for i in range(len(support_sets)):
@@ -82,7 +162,7 @@ def collate_fn(data):
 
 def get_loader(name, encoder, N, K, Q, batch_size, 
         num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data'):
-    dataset = FewRelDataset(name, encoder, N, K, Q, na_rate, root)#已经ID化
+    dataset = FewGraphDataset(name, encoder, N, K, Q, na_rate, root)#已经ID化 @jinhui 改变了FewRelDataset
     temp = dataset[0]# 参看数据format
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,

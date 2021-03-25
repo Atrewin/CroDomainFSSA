@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--val', default='dvd_reviews', help='val file')
     parser.add_argument('--test', default='dvd_reviews', help='test file')
     parser.add_argument('--adv', default=None, help="adv unlabeded reviews files")
-
+#几点
     # model training parameters
     parser.add_argument('--trainN', default=2, type=int, help='N in train')  # 固定trainN=2
     parser.add_argument('--N', default=2, type=int, help='N way')  # 固定N=2
@@ -83,7 +83,7 @@ def main():
             glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
         except:
             raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
-        sentence_encoder = CNNSentenceEncoder(glove_mat, glove_word2id, max_length)  # 编码领域不变特征
+        sentence_encoder = CNNSentenceEncoder(glove_mat, glove_word2id, max_length,hidden_size=opt.hidden_size)
     elif encoder_name == 'bert':
         pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
         sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)

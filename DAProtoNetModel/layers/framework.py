@@ -173,7 +173,7 @@ class FewShotREFramework:
 
             # @jinhui 疑惑:这里不会导致parameters_to_optimize和多个optimizer绑定吗?
             if self.adv:
-                optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)
+                optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)# 应该只限制到
 
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
                                                         num_training_steps=train_iter)
@@ -233,8 +233,15 @@ class FewShotREFramework:
 
             # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
             logits, pred = model(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
+            # 重构graphFeature
+            support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
+            graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
+
+            graphFeatureRcon = model.graphFeatureRecon(graphFeature)
+            loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.5 #可能影响太大了
 
             loss = model.loss(logits, label) / float(grad_iter)
+            loss = loss+ loss_recon
             right = model.accuracy(pred, label)
             if fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -255,7 +262,7 @@ class FewShotREFramework:
                     for k in support_adv:
                         support_adv[k] = support_adv[k].cuda()
 
-                # 这样会使得你的sentence encoder之时encode出领域不变特征。而忽略了领域特定特征
+                # 这样会使得你的sentence encoder之时encode出领域不变特征。而忽略了领域特定特征 #@jinhui 书写建议是写入到DaProtoNet内部
                 features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)
                 features_adv, _ = model.sentence_encoder(support_adv)
                 support_total = features_ori.size(0)
@@ -268,7 +275,7 @@ class FewShotREFramework:
                                               torch.ones((support_total // 2)).long().cuda()], 0)
 
                 dis_logits = self.d(features)
-                sen_logits = self.sen_d(features_ori)
+                sen_logits = self.sen_d(features_ori)# 这里貌似有点问题，不应该是这里可以分辨情绪
                 loss_dis = self.adv_cost(dis_logits, dis_labels)
                 # print(loss_dis) # tensor(0.7033, device='cuda:0', grad_fn=<NllLossBackward>)
                 sen_loss_dis = self.sen_cost(sen_logits, sentiment_labels)
@@ -282,24 +289,28 @@ class FewShotREFramework:
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()
+                optimizer.zero_grad()
 
                 sen_loss_dis.backward(retain_graph=True)
                 optimizer_sen_dis.step()
+
                 optimizer_sen_dis.zero_grad()
                 optimizer_dis.zero_grad()
-                optimizer_encoder.zero_grad()
+                # optimizer_encoder.zero_grad()#@jinhui 改 应该同步优化  所以它的loss先不清零
+                optimizer.zero_grad()
 
                 # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
-                dis_logits = self.d(features)  # @jinhui
+                dis_logits = self.d(features)  # @jinhui features要是保持之前的in_spect的梯度跟踪吗？
                 loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)  # # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
                 # print(loss_encoder)# tensor(0.6985, device='cuda:0', grad_fn=<NllLossBackward>)
                 loss_encoder.backward(retain_graph=True)  # torch 上面的loss_dis可以通过
                 # 可能的原因是，forward 和 backward前后有torch被inplace operarion 了
                 # .data 与 .detach()中可能在1.7版本中梯度的检查是不一样的
-                optimizer_encoder.step()  # 现在这里还包含最开始的loss 梯度在, 不知道要不要改
+                optimizer_encoder.step()  # 现在这里还包含最开始的loss 梯度在, 不知道要不要改，预计sent_acc会提高到80%以上
                 optimizer_dis.zero_grad()
                 optimizer_encoder.zero_grad()
                 optimizer_sen_dis.zero_grad()
+                optimizer.zero_grad()
 
                 iter_loss_dis += self.item(loss_dis.data)
                 iter_right_dis += right_dis

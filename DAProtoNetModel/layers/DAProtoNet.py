@@ -23,7 +23,7 @@ class DAProtoNet(framework.FewShotREModel):
         # encoder
         self.g1 = nn.Linear(graphFeature_size, hidden_size)
         self.g1_drop = nn.Dropout()
-        self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
+        # self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
 
 
         # graph feature decoder
@@ -79,25 +79,36 @@ class DAProtoNet(framework.FewShotREModel):
         in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
         hidden_size = in_support_emb.size(-1)
 
+        # # graph feature maps
+        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
+        # support_graphFeature_maps = self.g1(support_graphFeature)# 也没有inplace operator
+        # query_graphFeature_maps = self.g1(query_graphFeature)
+        #
+        #
+        # sp_support_emb = torch.cat([sp_support_emb, support_graphFeature_maps], axis=1)
+        # sp_query_emb = torch.cat([sp_query_emb, query_graphFeature_maps], axis=1)
+        # sp_support_feat = self.fc2(sp_support_emb) # 按理说犯了inplace错误呀
+        # sp_query_feat = self.fc2(sp_query_emb)
+        #
+        # # end @jinhui
+
+
+        ## 单单使用graphfeature 作为sp_feature
         # graph feature maps
         support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        support_graphFeature_maps = self.g1(support_graphFeature)# 也没有inplace operator
-        query_graphFeature_maps = self.g1(query_graphFeature)
-
-
-        sp_support_emb = torch.cat([sp_support_emb, support_graphFeature_maps], axis=1)
-        sp_query_emb = torch.cat([sp_query_emb, query_graphFeature_maps], axis=1)
-        sp_support_feat = self.fc2(sp_support_emb) # 按理说犯了inplace错误呀
-        sp_query_feat = self.fc2(sp_query_emb)
+        sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
+        sp_query_emb = self.g1(query_graphFeature)
 
         # end @jinhui
+
+
 
         """
             学习领域不变特征  Learn Domain Invariant Feature
         """
-        support_emb = torch.cat([in_support_emb, sp_support_feat], axis=1)  # (B*N*K, 2D)
+        support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
         support_emb = self.fc(support_emb)
-        query_emb = torch.cat([in_query_emb, sp_query_feat], axis=1)  # (B*Q*N, 2D)
+        query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
         query_emb = self.fc(query_emb)
 
         support = self.drop(support_emb)

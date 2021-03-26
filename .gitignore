@@ -199,5 +199,5 @@ extension/Post-Bert/checkpoints
 extension/Post-Bert/data/domain_data/data-bin
 extension/Post-Bert/data/domain_data/init_data/*
 extension/Post-Bert/data/domain_data/processed
-extension/Post-Bert/data/data_process_utils/gpt2_bpe
+
 

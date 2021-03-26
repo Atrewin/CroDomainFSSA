@@ -194,6 +194,7 @@ venv.bak/
 # data
 extension/Graph-Embedding/conceptnet_english.txt
 extension/Graph-Embedding/dataset/*
+extension/Graph-Embedding/preprocess_data
 extension/Post-Bert/checkpoints
 extension/Post-Bert/data/domain_data/data-bin
 extension/Post-Bert/data/domain_data/init_data/*

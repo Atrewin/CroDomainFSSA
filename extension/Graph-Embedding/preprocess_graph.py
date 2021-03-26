@@ -11,10 +11,11 @@ if sys.getdefaultencoding() != defaultencoding:
     sys.setdefaultencoding(defaultencoding)
 # 没有起到切换encoding的效果，变成在open（）上改
 
+
 if __name__ == '__main__':
     
     bow_size = 5000
-    
+
     print ('Extracting seed concepts from all domains.')
     all_seeds = obtain_all_seed_concepts(bow_size)
     

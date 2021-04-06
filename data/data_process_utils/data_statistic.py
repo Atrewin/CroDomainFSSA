@@ -7,7 +7,7 @@ from utils.path_util import from_project_root
 from utils import json_util
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--json_url", default="data/book_reviews.json", help="data_json_file")
+parser.add_argument("--json_url", default="data/domain_data/processed_data/books/reviews.json", help="data_json_file")
 opt = parser.parse_args()
 
 

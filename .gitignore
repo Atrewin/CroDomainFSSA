@@ -197,7 +197,9 @@ extension/Graph-Embedding/dataset/*
 extension/Graph-Embedding/preprocess_data
 extension/Post-Bert/checkpoints
 extension/Post-Bert/data/domain_data/data-bin
-extension/Post-Bert/data/domain_data/init_data/*
-extension/Post-Bert/data/domain_data/processed
+extension/Post-Bert/data/domain_data/init_data
+extension/Post-Bert/data/domain_data/processed_data
+
+
 
 

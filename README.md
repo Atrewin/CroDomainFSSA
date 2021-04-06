@@ -12,6 +12,7 @@
 > pip install transformers==3.0.2
 
 ### 运行graph training 
+* 'stanza'
 * 'torch_scatter==2.0.5'
 * 'torch_sparse==0.6.8'
 * 'torch_cluster==1.5.8'
@@ -54,3 +55,5 @@
 > CUDA_VISIBLE_DEVICES=5 python train_demo.py --K 5 --Q 5 --pretrain_step 0 --encoder cnn --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews
 * Proto(BERT)
 > CUDA_VISIBLE_DEVICES=0,1,2 python train_demo.py --K 5 --Q 1 --pretrain_step 100 --encoder bert --hidden_size 768 --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews --batch_size 2
+* Proto(Post-BERT)
+> CUDA_VISIBLE_DEVICES=0,1,2 python train_demo.py --K 5 --Q 1 --pretrain_step 1000 --encoder roberta --hidden_size 768 --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews --batch_size 2

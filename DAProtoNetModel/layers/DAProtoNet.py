@@ -18,6 +18,10 @@ class DAProtoNet(framework.FewShotREModel):
         self.dot = dot
         self.fc = nn.Linear(hidden_size*2, hidden_size)
 
+        self.featuretransfer = nn.Sequential(nn.Linear(hidden_size, hidden_size*2),
+                                         nn.Linear(hidden_size*2, hidden_size)
+                                         )
+
         # TODO jinhui
         # graph feature map
         # encoder
@@ -95,21 +99,23 @@ class DAProtoNet(framework.FewShotREModel):
 
         ## 单单使用graphfeature 作为sp_feature
         # graph feature maps
-        support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
-        sp_query_emb = self.g1(query_graphFeature)
+        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
+        # sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
+        # sp_query_emb = self.g1(query_graphFeature)
 
         # end @jinhui
 
+        ## 只使用in_encoder
 
-
+        support_emb = self.featuretransfer(in_support_emb)
+        query_emb = self.featuretransfer(in_query_emb)
         """
             学习领域不变特征  Learn Domain Invariant Feature
         """
-        support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
-        support_emb = self.fc(support_emb)
-        query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
-        query_emb = self.fc(query_emb)
+        # support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
+        # query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
+        # support_emb = self.fc(support_emb)
+        # query_emb = self.fc(query_emb)
 
         support = self.drop(support_emb)
         query = self.drop(query_emb)

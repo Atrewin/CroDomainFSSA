@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
-import  time
+import time
+import os
 from os.path import normpath,join,dirname
 from utils.path_util import from_project_root
 from utils import json_util
@@ -10,7 +11,7 @@ import sys
 import importlib
 import codecs
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-
+from data.data_process_utils.concept_util import getReviewConceptNetTriples
 def conceptNetAPI(word):
     url = "http://api.conceptnet.io/c/en/" + word + "?offset=0&limit=50"
     edges = requests.get(url).json()["edges"]# 被限制了20条, 需要都拿到吗？
@@ -30,19 +31,16 @@ def conceptNetAPI(word):
 
     return triples
 def addConceptNetTripe2reviewJson(reivewJsonList):
-    for index, reviewJson in enumerate(reivewJsonList):
-        reviewConcepts = reviewJson["concepts"]
-        conceptNetTriple = []
-        for concept in reviewConcepts:
-            conceptTripleList = conceptNetAPI(concept)
-            time.sleep(2)
-            conceptNetTriple.append(conceptTripleList)
 
-        reviewJson["conceptNetTriple"] = conceptNetTriple
+    for index, reviewJson in enumerate(reivewJsonList):
+
+        reviewConcepts = reviewJson["concepts"]
+        conceptNetTriples = getReviewConceptNetTriples(reviewConcepts)
+        reviewJson["conceptNetTriples"] = conceptNetTriples
         reivewJsonList[index] = reviewJson
         pass
-
-def getConceptNetTriple(data_file):
+    return reivewJsonList
+def addConceptNetTriple2JsonData(data_file):
     """
     :param data_file:
     :return:
@@ -56,11 +54,14 @@ def getConceptNetTriple(data_file):
             reivewJsonList = addConceptNetTripe2reviewJson(reivewJsonList)
             json_data[mode] = reivewJsonList
             pass
-        return json_data
-    else:
-        return addConceptNetTripe2reviewJson(json_data)
+        # 保存数据
+        json_util.dump(json_data, url)
 
-    print(" ")
+    else:
+        json_data = addConceptNetTripe2reviewJson(json_data)
+        json_util.dump(json_data, url)
+
+    print("addConceptNetTriple2JsonData to " + data_file)
 
 def getAllConcepts(urlList):
     conceptSet= set()
@@ -71,11 +72,16 @@ def getAllConcepts(urlList):
             for mode in ["pos", "neg"]:
                 reivewJsonList = json_data[mode]
                 for reviewJson in reivewJsonList:
-                    reviewConcepts = reviewJson["concepts"]
+                    if "concepts" in reviewJson.keys():
+                        reviewConcepts = reviewJson["concepts"]
+                    else:
+                        reviewConcepts = []
                     conceptSet.update(reviewConcepts)
         else:
-            reviewConcepts = reviewJson["concepts"]
-            conceptSet.update(reviewConcepts)
+            for reviewJson in json_data:
+                if "concepts" in reviewJson.keys():
+                    reviewConcepts = reviewJson["concepts"]
+                    conceptSet.update(reviewConcepts)
 
 
     return list(conceptSet)
@@ -109,13 +115,15 @@ def getDomainDataURL(domainList):
     return urlList
 global num
 num = 0
-def getConceptGraphDict(allConcepts):
+def getConceptGraphDict(allConcepts, presentConceptGraphDict):
     ConceptGraphDict = {}
     global num
     for concept in allConcepts:
-        conceptTripleList = conceptNetAPI(concept)
-        time.sleep(2)
-        ConceptGraphDict[concept] = conceptTripleList
+        if concept not in presentConceptGraphDict.keys():
+            conceptTripleList = conceptNetAPI(concept)
+            time.sleep(1)
+            ConceptGraphDict[concept] = conceptTripleList
+
         print('\r当前进度：{0}'.format(num), end='', flush=True)
         num = num + 1
 
@@ -130,10 +138,6 @@ if __name__ == '__main__':
     parser.add_argument("--end", default=2000,
                         help="endIndex")
     opt = parser.parse_args()
-    # 每篇独立获取方案， 将有严重的重复访问导致的访问量限制问题
-    # json_data = getConceptNetTriple(opt.json_url)
-    # # 保存数据
-    # json_util.dump(json_data, opt.json_url)
 
     # 统一获取后分配的方案
     domainList = ["books", "dvd", "electronics", "kitchen"]
@@ -144,15 +148,17 @@ if __name__ == '__main__':
     conceptGraphDict_keep_url = join(dataRoot, "conceptGraphDict.json")
     conceptGraphDict_keep_url = from_project_root(conceptGraphDict_keep_url)
 
-    #
+    # TODO save allconcept
     urlList = getDomainDataURL(domainList)
-    allConcepts = getAllConcepts(urlList)# 有接近两万个，而concept明天最多拿到3600个
-    # ConceptsSetDict = {}
-    # ConceptsSetDict["allDomain"] = allConcepts
-    # json_util.dump(ConceptsSetDict, concept_keep_url)
-    #
-    # ConceptsSetDict = json_util.load(concept_keep_url)
-    # allConcepts = ConceptsSetDict["allDomain"]
+    allConcepts = getAllConcepts(urlList)# 有接近两万个，而concept每小时最多拿到3600个
+    ConceptsSetDict = {}
+    ConceptsSetDict["allDomain"] = allConcepts
+    json_util.dump(ConceptsSetDict, concept_keep_url)
+
+
+    # TODO link conceptNet
+    ConceptsSetDict = json_util.load(concept_keep_url)
+    allConcepts = ConceptsSetDict["allDomain"]
 
 
     start = opt.start
@@ -166,13 +172,23 @@ if __name__ == '__main__':
     }
     for i in range(start,end,saveSetp):
         j = min(i+saveSetp,end)
-        newConcept2ConceptGraphDict = getConceptGraphDict(allConcepts[i:j])
+        if os.path.exists(conceptGraphDict_keep_url):
+            conceptGraphDict = json_util.load(conceptGraphDict_keep_url)
+        newConcept2ConceptGraphDict = getConceptGraphDict(allConcepts[i:j], conceptGraphDict["concept2ConceptGraphDict"])
         conceptGraphDict["concept2ConceptGraphDict"].update(newConcept2ConceptGraphDict)
         time.sleep(3)
         conceptGraphDict["tag"] = str(start) + "_" + str(i+saveSetp)
         json_util.dump(conceptGraphDict,conceptGraphDict_keep_url)
         print('\r当前进度：{0}{1}%'.format('▉' * int((i+saveSetp)/(end-start)*10), ((i+saveSetp)/(end-start)*100)), end='', flush=True)
-        conceptGraphDict = json_util.load(conceptGraphDict_keep_url)
 
 
-    print("完成获取concept"+ str(start) + end + "的获取")
+
+    print("完成获取concept"+ str(start) + "-" + str(end) + "的获取")
+
+    # TODO 回写到reviewJosnData
+    urlList = getDomainDataURL(domainList)
+    # 不用把，这个只是一个技巧文件，原则上不需要
+    for url in urlList:
+        addConceptNetTriple2JsonData(url)
+
+    print("完成获取conceptTriple写入JsonData")

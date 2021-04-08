@@ -1,5 +1,5 @@
-# coding=utf-8
-import sys
+# -*- coding:utf-8 -*
+import sys, io
 from os.path import normpath,join,dirname
 
 # sys.getdefaultencoding()    # 查看设置前系统默认编码
@@ -9,12 +9,14 @@ from os.path import normpath,join,dirname
 # print(__file__)
 # print(normpath(join(dirname(__file__), '../..')), flush=True)# 指向的是你文件运行的路径，如果在命令行跑那么它是根据你启动的路径来确认的
 sys.path.append(normpath(join(dirname(__file__), '../..')))
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 # 命令行中带的坑： 要加个PYTHONPATH=. 指向python工程的根目录，就可以省去很多麻烦（这是pycharm帮我们集成了的）
 # 运行的环境路径和工程链接路径的差异性   #核心冲突，命令行认为的项目根目录和实际的项目根目录
 
 # 使用统一基于工程根目录的方式组织文件目录
 from utils.path_util import from_project_root
 from utils import json_util
+from data.data_process_utils.concept_util import getReviewConceptNetTriples
 
 import argparse
 
@@ -132,11 +134,6 @@ class Filter():
 
             # pattern two
 
-
-
-
-
-
             return False
 
             pass
@@ -144,7 +141,7 @@ class Filter():
 
 
 def getReviewConceptsAndTriples(review, nlp, tripleSelectet=1):
-    doc = nlp(review)
+    doc = nlp(review)# dvd会使得报错的review
     concepts = []
     opinionConceptTriples = []
     filter = Filter()
@@ -179,7 +176,11 @@ def getReviewJsons(rawReviews):
         # 获取 reviewConcept 和conceptTriple
         review = process_reviews[index]# rawReviews[index] 中间会有写review的报错， 是nlp中的问题
         tripleSelectet = 1
-        concepts, opinionConceptTriples = getReviewConceptsAndTriples(review, nlp, tripleSelectet)
+        try:
+            concepts, opinionConceptTriples = getReviewConceptsAndTriples(review, nlp, tripleSelectet)
+        except:
+            print("一篇使得nlp(reviews)报错的文章--" + str(index) + "--\t--" + review)
+            continue
         reviewJson = {"tokens": tokens,
                       "concepts": concepts,
                       "opinionConceptTriples": opinionConceptTriples
@@ -216,15 +217,15 @@ def unlabeledReviews2json(unlabeled_reviews):
 def main():
     # 参数获取
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pos_xml_url", default="data/domain_data/init_data/books/positive.review", type=str,
+    parser.add_argument("--pos_xml_url", default="data/domain_data/init_data/dvd/positive.review", type=str,
                         help="Neg xml url")
-    parser.add_argument("--neg_xml_url", default="data/domain_data/init_data/books/negative.review", type=str,
+    parser.add_argument("--neg_xml_url", default="data/domain_data/init_data/dvd/negative.review", type=str,
                         help="Pos xml url")
-    parser.add_argument("--unlabeled_xml_url", default="data/domain_data/init_data/books/book.unlabeled", type=str,
+    parser.add_argument("--unlabeled_xml_url", default="data/domain_data/init_data/dvd/unlabeled.review", type=str,
                         help="unlabeled_xml_url")
-    parser.add_argument("--keep_url", default="data/domain_data/processed_data/books/reviews.json", type=str,
+    parser.add_argument("--keep_url", default="data/domain_data/processed_data/dvd/reviews.json", type=str,
                         help="save json url")
-    parser.add_argument("--unlabeled_keep_url", default="data/domain_data/processed_data/books/unlabeled_reviews.json",
+    parser.add_argument("--unlabeled_keep_url", default="data/domain_data/processed_data/dvd/unlabeled_reviews.json",
                         type=str, help="unlabeled_keep_url")
     opt = parser.parse_args()
 
@@ -242,11 +243,11 @@ def main():
 
     # 预处理 和 抽取文本的entities都封装到reviews2json内部因为entities的时候还需要使用到标点符号的分割
     # 将reviews转换成json结构 //包含tokens化；get entities
-    json_data = reviews2json(pos_reviews, neg_reviews)
+    # json_data = reviews2json(pos_reviews, neg_reviews)
     unlabeled_json_data = unlabeledReviews2json(unlabeled_reviews)
 
     # 保存数据
-    json_util.dump(json_data, keep_url)
+    # json_util.dump(json_data, keep_url)
     json_util.dump(unlabeled_json_data, unlabeled_keep_url)
 
 

@@ -1,13 +1,18 @@
 from tqdm import tqdm
-from utils_graph import unique_rows
-from utils import get_domain_dataset, spacy_seed_concepts_list
+from graphDataLoader import getDataSet
+from utils_data import get_domain_dataset, spacy_seed_concepts_list# utils的引用产生了包冲突问题
+from utils_graph import unique_rows#    不明白包引入的顺序问题
+from os.path import join
+import os
 import numpy as np, pickle, argparse
-
 import torch
 import torch.nn.functional as F
 from rgcn import RGCN
 from torch_scatter import scatter_add
 from torch_geometric.data import Data
+import sys
+import codecs
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 def sample_edge_uniform(n_triples, sample_size):
     """Sample edges uniformly from all the edges."""
@@ -172,12 +177,13 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=50000, help='graph batch size')
     parser.add_argument('--split-size', type=float, default=0.5, help='what fraction of graph edges used in training')
     parser.add_argument('--ns', type=int, default=1, help='negative sampling ratio')
-    parser.add_argument('--epochs', type=int, default=1500, help='number of epochs')
-    parser.add_argument('--save', type=int, default=100, help='save after how many epochs')
+    parser.add_argument('--epochs', type=int, default=104, help='number of epochs')
+    parser.add_argument('--save', type=int, default=50, help='save after how many epochs')
     parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
     parser.add_argument('--dropout', type=float, default=0.25, help='learning rate')
     parser.add_argument('--reg', type=float, default=1e-2, help='regularization coefficient')
     parser.add_argument('--grad-norm', type=float, default=1.0, help='grad norm')
+    parser.add_argument("--data_root", default="data/domain_data/processed_data", help="data_json_dir")
     args = parser.parse_args()
     print(args)
     
@@ -190,30 +196,45 @@ if __name__ == '__main__':
     dropout = args.dropout
     regularization = args.reg
     grad_norm = args.grad_norm
+    domainList = ["books"]
+    data_root = args.data_root
+    fileName = ""
+    for domain in domainList:
+        fileName = fileName + domain + "_"
+        pass
+    fileName = join("preprocess_data", fileName)[0:-1]
 
-    all_seeds = pickle.load(open('preprocess_data/all_seeds.pkl', 'rb'))
-    relation_map = pickle.load(open('preprocess_data/relation_map.pkl', 'rb'))
-    unique_nodes_mapping = pickle.load(open('preprocess_data/unique_nodes_mapping.pkl', 'rb'))
+    all_seeds = pickle.load(open(fileName + '/all_seeds.pkl', 'rb'))
+    relation_map = pickle.load(open(fileName + '/relation_map.pkl', 'rb'))
+    unique_nodes_mapping = pickle.load(open(fileName + '/unique_nodes_mapping.pkl', 'rb'))# node_index2int_id
     concept_graphs = pickle.load(open('preprocess_data/concept_graphs.pkl', 'rb'))
-    train_triplets = np.load(open('preprocess_data/triplets.np', 'rb'), allow_pickle=True)#
+    train_triplets = np.load(open(fileName + '/triplets.np', 'rb'), allow_pickle=True)#
     
     n_bases = 4
     model = RGCN(len(unique_nodes_mapping), len(relation_map), num_bases=n_bases, dropout=dropout).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
+    dataset = getDataSet(domainList, data_root)
+    review_batch_size = 50
     for epoch in tqdm(range(1, (n_epochs + 1)), desc='Epochs', position=0):
 
-        permutation = torch.randperm(len(train_triplets))#随机在all_seeds filter 的sub_graph总构造图来训练
+        permutation = torch.randperm(dataset.__len__())#随机在all_seeds filter 的sub_graph总构造图来训练
         losses = []
 
-        for i in range(0, len(train_triplets), graph_batch_size):# graph_batch_size = 5000
+        for i in range(0, len(permutation),review_batch_size):# graph_batch_size 随每篇文章变化
             
             model.train()
             optimizer.zero_grad()
-            
-            indices = permutation[i:i+graph_batch_size]
 
-            score, loss = train(train_triplets[indices], model, batch_size=len(indices), split_size=graph_split_size, 
+            indices = permutation[i:i+review_batch_size]
+            reviews = np.zeros((1,3), dtype = int)
+            for index in indices:
+                if len(dataset[index]) == 0:  # jinhui 为了加快验证
+                    continue
+                reviews = np.concatenate((reviews,dataset[index]), axis=0)
+            reviews = reviews[1:]
+            if len(reviews) == 0:  # jinhui 为了加快验证
+                continue
+            score, loss = train(reviews, model, batch_size=len(reviews), split_size=graph_split_size,
                                 negative_sample=negative_sample, reg_ratio = regularization, 
                                 num_entities=len(unique_nodes_mapping), num_relations=len(relation_map))
             

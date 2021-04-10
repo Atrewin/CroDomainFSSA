@@ -99,23 +99,23 @@ class DAProtoNet(framework.FewShotREModel):
 
         ## 单单使用graphfeature 作为sp_feature
         # graph feature maps
-        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        # sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
-        # sp_query_emb = self.g1(query_graphFeature)
+        support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
+        sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
+        sp_query_emb = self.g1(query_graphFeature)
 
         # end @jinhui
 
         ## 只使用in_encoder
 
-        support_emb = self.featuretransfer(in_support_emb)
-        query_emb = self.featuretransfer(in_query_emb)
+        # support_emb = self.featuretransfer(in_support_emb)
+        # query_emb = self.featuretransfer(in_query_emb)
         """
             学习领域不变特征  Learn Domain Invariant Feature
         """
-        # support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
-        # query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
-        # support_emb = self.fc(support_emb)
-        # query_emb = self.fc(query_emb)
+        support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
+        query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
+        support_emb = self.fc(support_emb)
+        query_emb = self.fc(query_emb)
 
         support = self.drop(support_emb)
         query = self.drop(query_emb)
@@ -131,4 +131,37 @@ class DAProtoNet(framework.FewShotREModel):
         _, pred = torch.max(logits.view(-1, N + 1), 1)
 
         return logits, pred
+
+    def forwad_postBERT_newGraph(self, support, query, N, K, total_Q):
+        in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
+        in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
+        hidden_size = in_support_emb.size(-1)
+
+        support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
+        query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
+        support_emb = self.fc(support_emb)
+        query_emb = self.fc(query_emb)
+
+        ## 单单使用graphfeature 作为sp_feature
+        # graph feature maps
+        support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
+        sp_support_emb = self.g1(support_graphFeature)  # 也没有inplace operator
+        sp_query_emb = self.g1(query_graphFeature)
+
+
+        support = self.drop(support_emb)
+        query = self.drop(query_emb)
+        support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+        query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+        # Prototypical Networks
+        # Ignore NA policy
+        support = torch.mean(support, 2)  # Calculate prototype for each class
+        logits = self.__batch_dist__(support, query)  # (B, total_Q, N)
+        minn, _ = logits.min(-1)
+        logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+        _, pred = torch.max(logits.view(-1, N + 1), 1)
+
+        return logits, pred
+
 

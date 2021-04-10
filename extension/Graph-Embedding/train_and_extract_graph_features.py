@@ -177,13 +177,15 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=50000, help='graph batch size')
     parser.add_argument('--split-size', type=float, default=0.5, help='what fraction of graph edges used in training')
     parser.add_argument('--ns', type=int, default=1, help='negative sampling ratio')
-    parser.add_argument('--epochs', type=int, default=104, help='number of epochs')
+    parser.add_argument('--epochs', type=int, default=1000, help='number of epochs')
     parser.add_argument('--save', type=int, default=50, help='save after how many epochs')
     parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
     parser.add_argument('--dropout', type=float, default=0.25, help='learning rate')
     parser.add_argument('--reg', type=float, default=1e-2, help='regularization coefficient')
     parser.add_argument('--grad-norm', type=float, default=1.0, help='grad norm')
     parser.add_argument("--data_root", default="data/domain_data/processed_data", help="data_json_dir")
+    parser.add_argument("--domain", default="books",
+                        help="domain name")
     args = parser.parse_args()
     print(args)
     
@@ -196,18 +198,20 @@ if __name__ == '__main__':
     dropout = args.dropout
     regularization = args.reg
     grad_norm = args.grad_norm
-    domainList = ["books"]
+    domainName = args.domain
+    domainList = [domainName]# dvd
     data_root = args.data_root
-    fileName = ""
+    filePath = ""
     for domain in domainList:
-        fileName = fileName + domain + "_"
+        filePath = filePath + domain + "_"
         pass
-    fileName = join("preprocess_data", fileName)[0:-1]
+    filePath = filePath[0:-1]
+    fileName = join("preprocess_data", filePath)
 
     all_seeds = pickle.load(open(fileName + '/all_seeds.pkl', 'rb'))
     relation_map = pickle.load(open(fileName + '/relation_map.pkl', 'rb'))
     unique_nodes_mapping = pickle.load(open(fileName + '/unique_nodes_mapping.pkl', 'rb'))# node_index2int_id
-    concept_graphs = pickle.load(open('preprocess_data/concept_graphs.pkl', 'rb'))
+    # concept_graphs = pickle.load(open(fileName + '/concept_graphs.pkl', 'rb'))
     train_triplets = np.load(open(fileName + '/triplets.np', 'rb'), allow_pickle=True)#
     
     n_bases = 4
@@ -247,15 +251,15 @@ if __name__ == '__main__':
 
         if epoch%save_every == 0:
             tqdm.write("Epoch {} Train Loss: {}".format(epoch, avg_loss))
-            torch.save(model.state_dict(), 'weights/model_epoch' + str(epoch) +'.pt')
+            torch.save(model.state_dict(), 'weights/model_epoch' + str(epoch) + "_" + filePath +'.pt')
             
     model.eval()
 
-    for domain in ['books', 'dvd', 'electronics', 'kitchen']:
-        print ('Extracting features for', domain)
-        for split in ['test', 'small']:
-            sf = sentence_features(model, domain, split, all_seeds, concept_graphs, relation_map, unique_nodes_mapping)
-            np.ndarray.dump(sf, open('../../data/graph_features/sf_' + domain + '_' + split + '_5000.np', 'wb'))
+    # for domain in ['books', 'dvd', 'electronics', 'kitchen']:
+    #     print ('Extracting features for', domain)
+    #     for split in ['test', 'small']:
+    #         sf = sentence_features(model, domain, split, all_seeds, concept_graphs, relation_map, unique_nodes_mapping)
+    #         np.ndarray.dump(sf, open('../../data/graph_features/sf_' + domain + '_' + split + '_5000.np', 'wb'))
 
     print ('Done.')
     

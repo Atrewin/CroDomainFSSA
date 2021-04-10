@@ -3,6 +3,10 @@ import sys
 import time
 import os
 from os.path import normpath,join,dirname
+Base_DIR=normpath(join(os.path.dirname(os.path.abspath(__file__)), '../..'))
+sys.path.insert(0,Base_DIR)#添加环境变量，因为append是从列表最后开始添加路径，可能前面路径有重复，最好用sys.path.insert(Base_DIR)从列表最前面开始添加
+
+from os.path import normpath,join,dirname
 from utils.path_util import from_project_root
 from utils import json_util
 import requests
@@ -34,7 +38,7 @@ def addConceptNetTripe2reviewJson(reivewJsonList):
 
     for index, reviewJson in enumerate(reivewJsonList):
         reviewConcepts = reviewJson["concepts"]
-        if "conceptNetTriples" not in reviewJson.keys():
+        if "conceptNetTriples" not in reviewJson.keys() or len(reviewJson["conceptNetTriples"] == 0 ):
             conceptNetTriples = getReviewConceptNetTriples(reviewConcepts)
             reviewJson["conceptNetTriples"] = conceptNetTriples
             reivewJsonList[index] = reviewJson
@@ -151,7 +155,7 @@ if __name__ == '__main__':
 
     # TODO 回写到reviewJosnData
     urlList = getDomainDataURL(domainList)
-    # 不用把，这个只是一个技巧文件，原则上不需要
+
     for url in urlList:
         addConceptNetTriple2JsonData(url)
 

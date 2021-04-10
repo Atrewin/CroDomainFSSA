@@ -2,9 +2,6 @@
 import sys, io
 from os.path import normpath,join,dirname
 
-# sys.getdefaultencoding()    # 查看设置前系统默认编码
-# sys.setdefaultencoding('utf-8')
-# sys.getdefaultencoding()    # 查看设置后系统默认编码
 # print("---"*15)
 # print(__file__)
 # print(normpath(join(dirname(__file__), '../..')), flush=True)# 指向的是你文件运行的路径，如果在命令行跑那么它是根据你启动的路径来确认的
@@ -16,7 +13,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 # 使用统一基于工程根目录的方式组织文件目录
 from utils.path_util import from_project_root
 from utils import json_util
-from data.data_process_utils.concept_util import getReviewConceptNetTriples
+
 
 import argparse
 

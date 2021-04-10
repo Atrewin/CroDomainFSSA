@@ -56,4 +56,4 @@
 * Proto(BERT)
 > CUDA_VISIBLE_DEVICES=0,1,2 python train_demo.py --K 5 --Q 1 --pretrain_step 100 --encoder bert --hidden_size 768 --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews --batch_size 2
 * Proto(Post-BERT)
-> CUDA_VISIBLE_DEVICES=0,1,2 python train_demo.py --K 5 --Q 1 --pretrain_step 1000 --encoder roberta --hidden_size 768 --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews --batch_size 2
+> CUDA_VISIBLE_DEVICES=3,1,2 python train_demo.py --K 5 --Q 1 --pretrain_step 1200 --encoder roberta --hidden_size 768 --train book_reviews  --val dvd_reviews --test dvd_reviews --adv dvd_unlabeled_reviews --batch_size 2

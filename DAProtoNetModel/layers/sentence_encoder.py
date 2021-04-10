@@ -181,6 +181,54 @@ class RobertaSentenceEncoder(nn.Module):
 
         return indexed_tokens
 
+
+class RobertaNewgraphSentenceEncoder(nn.Module):
+    def __init__(self, pretrain_path,checkpoint_name, max_length, graphFeature_size=100, hidden_size=768, cat_entity_rep=False):
+        nn.Module.__init__(self)
+        # 也可以考虑直接取Bert CSL 和SLP的方案
+        from fairseq.models.roberta import RobertaModel
+        self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+
+        self.max_length = max_length
+        self.cat_entity_rep = cat_entity_rep
+
+        # TODO jinhui
+        # graph feature map
+        # encoder
+        self.g1 = nn.Linear(graphFeature_size, hidden_size)
+        self.g1_drop = nn.Dropout()
+
+
+
+    def forward(self, inputs):
+        in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
+        sp_x = self.g1(self.getGraphFeature(inputs))
+
+        return in_x[:,1,:], sp_x
+
+
+
+    def tokenize(self, raw_tokens):
+        # token -> index #查看到raw_tokens本身有CLS
+
+        tokens = 'CLS'
+        for token in raw_tokens:
+            tokens += " " + token
+        indexed_tokens = self.in_roberta.encode(tokens).tolist()
+
+
+        # padding
+        while len(indexed_tokens) < self.max_length:
+            indexed_tokens.append(2)#该用什么填充呢？
+        indexed_tokens = indexed_tokens[:self.max_length]
+
+        return indexed_tokens
+
+    def getGraphFeature(self, inputs):
+        # 直接返回的方案
+        return inputs["graphFeature"]
+
+
 class RobertaPAIRSentenceEncoder(nn.Module):
 
     def __init__(self, pretrain_path, max_length): 

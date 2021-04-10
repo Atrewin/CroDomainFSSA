@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
 import sys
 import time
-import os
-from os.path import normpath,join,dirname
-from utils.path_util import from_project_root
-from utils import json_util
+from tqdm import tqdm
 import requests
 import argparse
 import sys
-import importlib
 import codecs
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+
+import os
+from os.path import normpath,join
+Base_DIR=normpath(join(os.path.dirname(os.path.abspath(__file__)), '../..'))
+sys.path.insert(0,Base_DIR)#添加环境变量，因为append是从列表最后开始添加路径，可能前面路径有重复，最好用sys.path.insert(Base_DIR)从列表最前面开始添加
+from utils.path_util import from_project_root
+from utils import json_util
 from data.data_process_utils.concept_util import getReviewConceptNetTriples
+
 def conceptNetAPI(word):
     url = "http://api.conceptnet.io/c/en/" + word + "?offset=0&limit=50"
     edges = requests.get(url).json()["edges"]# 被限制了20条, 需要都拿到吗？
@@ -35,9 +39,10 @@ def addConceptNetTripe2reviewJson(reivewJsonList):
     for index, reviewJson in enumerate(reivewJsonList):
 
         reviewConcepts = reviewJson["concepts"]
-        conceptNetTriples = getReviewConceptNetTriples(reviewConcepts)
-        reviewJson["conceptNetTriples"] = conceptNetTriples
-        reivewJsonList[index] = reviewJson
+        if "conceptNetTriples" not in reviewJson.keys() and len(reviewJson["conceptNetTriples"] >0 ):
+            conceptNetTriples = getReviewConceptNetTriples(reviewConcepts)
+            reviewJson["conceptNetTriples"] = conceptNetTriples
+            reivewJsonList[index] = reviewJson
         pass
     return reivewJsonList
 def addConceptNetTriple2JsonData(data_file):
@@ -86,7 +91,7 @@ def getAllConcepts(urlList):
 
     return list(conceptSet)
 
-def getDomainDataURL(domainList):
+def getDomainDataURL(domainList):# 在concept_utils上也有集中的实现
     root = "data/domain_data/processed_data"
     urlList = []
     for domain in domainList:
@@ -118,13 +123,13 @@ num = 0
 def getConceptGraphDict(allConcepts, presentConceptGraphDict):
     ConceptGraphDict = {}
     global num
-    for concept in allConcepts:
+    for concept in tqdm(allConcepts, position=0, leave=False):
         if concept not in presentConceptGraphDict.keys():
             conceptTripleList = conceptNetAPI(concept)
-            time.sleep(1)
+            time.sleep(2)
             ConceptGraphDict[concept] = conceptTripleList
 
-        print('\r当前进度：{0}'.format(num), end='', flush=True)
+
         num = num + 1
 
     return ConceptGraphDict
@@ -159,7 +164,7 @@ if __name__ == '__main__':
     # TODO link conceptNet
     ConceptsSetDict = json_util.load(concept_keep_url)
     allConcepts = ConceptsSetDict["allDomain"]
-
+    print("total " + len(allConcepts) + "concepts")
 
     start = opt.start
     end = opt.end
@@ -170,7 +175,7 @@ if __name__ == '__main__':
         "tag": "none",
         "concept2ConceptGraphDict": {}
     }
-    for i in range(start,end,saveSetp):
+    for i in tqdm(range(start,end,saveSetp), position=0, leave=False):
         j = min(i+saveSetp,end)
         if os.path.exists(conceptGraphDict_keep_url):
             conceptGraphDict = json_util.load(conceptGraphDict_keep_url)
@@ -179,7 +184,6 @@ if __name__ == '__main__':
         time.sleep(3)
         conceptGraphDict["tag"] = str(start) + "_" + str(i+saveSetp)
         json_util.dump(conceptGraphDict,conceptGraphDict_keep_url)
-        print('\r当前进度：{0}{1}%'.format('▉' * int((i+saveSetp)/(end-start)*10), ((i+saveSetp)/(end-start)*100)), end='', flush=True)
 
 
 

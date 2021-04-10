@@ -61,6 +61,7 @@ class FewRelDataset(data.Dataset):
         return 1000000000
 
 
+
 class FewGraphDataset(data.Dataset):
     """
     FewRel Dataset add Graph feature
@@ -69,18 +70,13 @@ class FewGraphDataset(data.Dataset):
 
     def __init__(self, name, encoder, N, K, Q, na_rate, root):
         self.root = root
+        self.root = root
         path = os.path.join(root, name + ".json")
         if not os.path.exists(path):
             print("[ERROR] Data file does not exist!")
             assert (0)
         self.json_data = json.load(open(path, encoding='utf-8'))  # ok
-
-        name = name.split("_")[0]
-        path = os.path.join(root, 'graph_features/sf_' + name + '_small_5000.np')
-        if not os.path.exists(path):
-            print("[ERROR] Data file does not exist!")
-            assert (0)
-        self.graph_feature = self.load_graphFeature(path)
+        # self.graph_feature = self.load_graphFeature(self.graphFeaturePath(root,name))
         self.classes = list(self.json_data.keys())
         self.N = N
         self.K = K
@@ -112,13 +108,8 @@ class FewGraphDataset(data.Dataset):
                     self.json_data[class_name][j])
                 word = torch.tensor(word).long()
 
-                if class_name == "pos":
-                    graphFeature = self.graph_feature[j]
-                else:
-                    graphFeature = self.graph_feature[j+1000]#因为两个文件的数据组织差异导致的
-
+                graphFeature = self.json_data[class_name][j]["graphFeature"]
                 graphFeature = torch.tensor(graphFeature).type(torch.FloatTensor)
-
 
                 if count < self.K:
                     self.__additem__(support_set, word, graphFeature)
@@ -139,8 +130,19 @@ class FewGraphDataset(data.Dataset):
         X_s_ = np.load(open(path, 'rb'), allow_pickle=True)
 
         return X_s_
+    def graphFeaturePath(self, root, name):
+        path = os.path.join(root, name + ".json")
+        if not os.path.exists(path):
+            print("[ERROR] Data file does not exist!")
+            assert (0)
+        self.json_data = json.load(open(path, encoding='utf-8'))  # ok
 
-
+        name = name.split("_")[0]
+        path = os.path.join(root, 'graph_features/sf_' + name + '_small_5000.np')
+        if not os.path.exists(path):
+            print("[ERROR] Data file does not exist!")
+            assert (0)
+        return path
 def collate_fn(data):
     batch_support = {'word': [], "graphFeature":[]}
     batch_query = {'word': [], "graphFeature":[]}
@@ -161,7 +163,7 @@ def collate_fn(data):
 
 
 def get_loader(name, encoder, N, K, Q, batch_size, 
-        num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data'):
+        num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data/domain_data/processed_data'):
     dataset = FewGraphDataset(name, encoder, N, K, Q, na_rate, root)#已经ID化 @jinhui 改变了FewRelDataset
     temp = dataset[0]# 参看数据format
     data_loader = data.DataLoader(dataset=dataset,
@@ -280,7 +282,7 @@ def collate_fn_pair(data):
     return batch_set, batch_label
 
 def get_loader_pair(name, encoder, N, K, Q, batch_size, 
-        num_workers=8, collate_fn=collate_fn_pair, na_rate=0, root='./data', encoder_name='bert'):
+        num_workers=8, collate_fn=collate_fn_pair, na_rate=0, root='./data/domain_data/processed_data', encoder_name='bert'):
     dataset = FewRelDatasetPair(name, encoder, N, K, Q, na_rate, root, encoder_name)
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,
@@ -344,7 +346,7 @@ def collate_fn_unsupervised(data):
 
 
 def get_loader_unsupervised(name, encoder, N, K, Q, batch_size, 
-        num_workers=8, collate_fn=collate_fn_unsupervised, na_rate=0, root='./data'):
+        num_workers=8, collate_fn=collate_fn_unsupervised, na_rate=0, root='./data/domain_data/processed_data'):
     dataset = FewRelUnsupervisedDataset(name, encoder, N, K, Q, na_rate, root)
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,
@@ -355,3 +357,7 @@ def get_loader_unsupervised(name, encoder, N, K, Q, batch_size,
     return iter(data_loader)
 
 
+
+if __name__ == '__main__':
+
+    pass

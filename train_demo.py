@@ -7,7 +7,7 @@ import argparse
 import os
 from DAProtoNetModel.layers.data_loader import get_loader, get_loader_unsupervised
 from DAProtoNetModel.layers.framework import FewShotREFramework
-from DAProtoNetModel.layers.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder
+from DAProtoNetModel.layers.sentence_encoder import *
 from DAProtoNetModel.layers.DAProtoNet import DAProtoNet
 from DAProtoNetModel.layers.d import Discriminator
 from DAProtoNetModel.layers.sen_d import Sen_Discriminator
@@ -17,9 +17,9 @@ def main():
     parser = argparse.ArgumentParser()
 
     # data url parameters
-    parser.add_argument('--train', default='book_reviews', help='train file')
-    parser.add_argument('--val', default='dvd_reviews', help='val file')
-    parser.add_argument('--test', default='dvd_reviews', help='test file')
+    parser.add_argument('--train', default='books/book_reviews', help='train file')
+    parser.add_argument('--val', default='dvd/dvd_reviews', help='val file')
+    parser.add_argument('--test', default='dvd/dvd_reviews', help='test file')
     parser.add_argument('--adv', default=None, help="adv unlabeded reviews files")
 #几点
     # model training parameters
@@ -33,8 +33,8 @@ def main():
     parser.add_argument('--val_iter', default=1000, type=int, help='num of iters in validation')
     parser.add_argument('--test_iter', default=10000, type=int, help='num of iters in testing')
     parser.add_argument('--val_step', default=2000, type=int, help='val after training how many iters')
-    parser.add_argument('--encoder', default='cnn', help='encoder: cnn or bert or roberta')
-    parser.add_argument('--max_length', default=200, type=int, help='max length')  # 数据集的平均长度
+    parser.add_argument('--encoder', default='roberta', help='encoder: cnn or bert or roberta')
+    parser.add_argument('--max_length', default=150, type=int, help='max length')  # 数据集的平均长度
     parser.add_argument('--lr', default=-1, type=float, help='learning rate')
     parser.add_argument('--weight_decay', default=1e-5, type=float, help='weight decay')
     parser.add_argument('--dropout', default=0.0, type=float, help='dropout rate')
@@ -77,22 +77,8 @@ def main():
     print("encoder: {}".format(encoder_name))
     print("max_length: {}".format(max_length))
 
-    if encoder_name == 'cnn':
-        try:
-            glove_mat = np.load('./pretrain/glove/glove_mat.npy')
-            glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
-        except:
-            raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
-        sentence_encoder = CNNSentenceEncoder(glove_mat, glove_word2id, max_length,hidden_size=opt.hidden_size)
-    elif encoder_name == 'bert':
-        pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
-        sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)
-    elif encoder_name == 'roberta':
-        pretrain_ckpt = opt.pretrain_ckpt
-        filepath, tempfilename = os.path.split(pretrain_ckpt)
-        sentence_encoder =RobertaSentenceEncoder(filepath,tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
-    else:
-        raise NotImplementedError
+    sentence_encoder = getSentenceEncoder(encoder_name, opt)
+
 
     train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
     val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
@@ -164,6 +150,37 @@ def main():
     acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)
     print("RESULT: %.2f" % (acc * 100))
 
+
+def getSentenceEncoder(encoder_name, opt):
+
+    if encoder_name == 'cnn':
+        try:
+            glove_mat = np.load('./pretrain/glove/glove_mat.npy')
+            glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
+        except:
+            raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
+        max_length = opt.max_length
+        sentence_encoder = CNNSentenceEncoder(glove_mat, glove_word2id, max_length,hidden_size=opt.hidden_size)
+    elif encoder_name == 'bert':
+        pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
+        max_length = opt.max_length
+        sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)
+    elif encoder_name == 'roberta':
+        pretrain_ckpt = opt.pretrain_ckpt
+        max_length = opt.max_length
+        filepath, tempfilename = os.path.split(pretrain_ckpt)
+        sentence_encoder =RobertaSentenceEncoder(filepath,tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
+    elif encoder_name == 'roberta_newGraph':
+        pretrain_ckpt = opt.pretrain_ckpt
+        max_length = opt.max_length
+        filepath, tempfilename = os.path.split(pretrain_ckpt)
+        sentence_encoder = RobertaNewgraphSentenceEncoder(filepath,tempfilename, max_length, cat_entity_rep=opt.cat_entity_rep)
+
+
+    else:
+        raise NotImplementedError
+
+    return sentence_encoder
 
 if __name__ == "__main__":
     main()

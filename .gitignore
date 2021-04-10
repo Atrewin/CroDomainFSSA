@@ -200,4 +200,4 @@ extension/Post-Bert/data/domain_data/data-bin
 extension/Post-Bert/data/domain_data/init_data/*
 extension/Post-Bert/data/domain_data/processed_data
 data/domain_data/processed_data
-
+extension/Graph-Embedding/weights

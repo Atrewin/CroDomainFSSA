@@ -22,12 +22,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", default="data/domain_data/processed_data",
                         help="data_json_dir")
-
+    parser.add_argument("--domain", default="books",
+                        help="domain name")
     opt = parser.parse_args()
 
     print ('Extracting seed concepts from all domains.')
 
-    domainList = ["books"]# , "dvd", "electronics", "kitchen" 用于控制从大图中抽取什么样的节点作为
+    domainList = [opt.domain]# , "books", "dvd"，"electronics", "kitchen" 用于控制从大图中抽取什么样的节点作为
+
     urlList = getDomainDataURL(domainList,opt.data_path)
     all_seeds = getAllConcepts(urlList)  # 有接近两万个，而concept每小时最多拿到3600个
     

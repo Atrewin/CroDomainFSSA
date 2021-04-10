@@ -18,23 +18,17 @@ class DAProtoNet(framework.FewShotREModel):
         self.dot = dot
         self.fc = nn.Linear(hidden_size*2, hidden_size)
 
-        self.featuretransfer = nn.Sequential(nn.Linear(hidden_size, hidden_size*2),
-                                         nn.Linear(hidden_size*2, hidden_size)
-                                         )
-
         # TODO jinhui
         # graph feature map
-        # encoder
-        self.g1 = nn.Linear(graphFeature_size, hidden_size)
-        self.g1_drop = nn.Dropout()
-        # self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
-
 
         # graph feature decoder
-        self.d1 = nn.Linear(hidden_size, 100)
-        self.d2 = nn.Linear(100, graphFeature_size)
-        self.d_drop = nn.Dropout()
+        self.graphFeatureRecon =  nn.Sequential(
+                            nn.Linear(hidden_size, 100),
+                            nn.Linear(100, graphFeature_size))
+        #TODO 对抗训练的
+        # 情感分析
 
+        # 领域区分
 
 
 
@@ -52,18 +46,8 @@ class DAProtoNet(framework.FewShotREModel):
     def getGraphFeature(self,support, query):
         support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
         return support_graphFeature, query_graphFeature
-
-    def graphFeatureRecon(self, graphFeature):
-
-        graphFeature_maps = self.g1(graphFeature)  # 也没有inplace operator
-        # query_graphFeature_maps = self.g1(query_graphFeature)
-
-        graphFeature_ = self.d1(graphFeature_maps)
-        graphFeature_ = F.relu(graphFeature_)
-        graphFeature_ = self.d_drop(graphFeature_)
-        # z = torch.sigmoid(self.d2(z))
-        graphFeature_ = self.d2(graphFeature_)
-        return graphFeature_
+    def getGraphFeatureRecon(self):
+        return self.reconGraphFeature
 
     def loss_recon(self, recon_x, x):
         dim = x.size(1)
@@ -99,9 +83,9 @@ class DAProtoNet(framework.FewShotREModel):
 
         ## 单单使用graphfeature 作为sp_feature
         # graph feature maps
-        support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
-        sp_query_emb = self.g1(query_graphFeature)
+        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
+        # sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
+        # sp_query_emb = self.g1(query_graphFeature)
 
         # end @jinhui
 
@@ -132,7 +116,7 @@ class DAProtoNet(framework.FewShotREModel):
 
         return logits, pred
 
-    def forwad_postBERT_newGraph(self, support, query, N, K, total_Q):
+    def forward_postBERT_newGraph(self, support, query, N, K, total_Q):
         in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
         in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
         hidden_size = in_support_emb.size(-1)
@@ -141,12 +125,6 @@ class DAProtoNet(framework.FewShotREModel):
         query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
         support_emb = self.fc(support_emb)
         query_emb = self.fc(query_emb)
-
-        ## 单单使用graphfeature 作为sp_feature
-        # graph feature maps
-        support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        sp_support_emb = self.g1(support_graphFeature)  # 也没有inplace operator
-        sp_query_emb = self.g1(query_graphFeature)
 
 
         support = self.drop(support_emb)
@@ -161,6 +139,12 @@ class DAProtoNet(framework.FewShotREModel):
         minn, _ = logits.min(-1)
         logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
         _, pred = torch.max(logits.view(-1, N + 1), 1)
+
+        # 回购graph feature
+        support_graphFeature, query_graphFeature = sp_support_emb, sp_query_emb
+        graphFeature_map = torch.cat([support_graphFeature, query_graphFeature], 0)
+        reconGraphFeature = self.graphFeatureRecon(graphFeature_map)
+        self.reconGraphFeature = reconGraphFeature
 
         return logits, pred
 

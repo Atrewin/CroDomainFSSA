@@ -26,21 +26,6 @@ class ReviewGraphDataset(Dataset):  # 继承Dataset
         review = self.rawDataset[index]  # 根据索引index获取该review
         maps = self.maps
         reviewTriples = rawTriples2index(review, maps)
-        # 封装到concept_util了
-        # for triple in review:# 这个步骤也很慢，推荐之后转换好直接读取
-        #     try:
-        #         # 到word2int
-        #         srcMap = self.concept_map[triple[0]]
-        #         relMap = self.relation_map[triple[1]]
-        #         distMap = self.concept_map[triple[2]]
-        #         #  到int2node_index # 存在数组越界的情况unique_nodes_mapping：8090 concept_map：118651# 实际上是数据不一致的问题
-        #
-        #         srcMap, distMap = self.unique_nodes_mapping[srcMap], self.unique_nodes_mapping[distMap]
-        #     except:
-        #         await = 0 # 实际上是数据不一致的问题 主要是前后数据没有连起来，导致字典为空的查询
-        #         continue
-        #     triple = [srcMap, relMap, distMap]
-        #     reviewTriples.append(triple)
 
         return np.array(reviewTriples)  # 返回该review
 

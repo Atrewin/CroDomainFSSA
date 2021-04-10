@@ -9,14 +9,22 @@ class Sen_Discriminator(nn.Module):
         nn.Module.__init__(self)
         self.hidden_size = hidden_size
         self.num_labels = num_labels
-        self.fc1 = nn.Linear(hidden_size, hidden_size)
-        self.relu1 = nn.ReLU()
-        self.drop = nn.Dropout()
-        self.fc2 = nn.Linear(hidden_size, 2)
+
+        self.sentimentClass = nn.Sequential(
+            nn.Linear(hidden_size, int(hidden_size/8)*2),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(int(hidden_size/8)*2, int(hidden_size/16)),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(hidden_size, 2)
+        )
+
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu1(x)
-        x = self.drop(x)
+        x = self.sentimentClass(x)
+
         logits = self.fc2(x)
         return logits
+
+

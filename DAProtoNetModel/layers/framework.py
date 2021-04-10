@@ -70,18 +70,23 @@ class FewShotREFramework:
         val_data_loader: DataLoader for validating.
         test_data_loader: DataLoader for testing.
         '''
+        # 准备训练数据
         self.train_data_loader = train_data_loader
         self.val_data_loader = val_data_loader
         self.test_data_loader = test_data_loader
         self.adv_data_loader = adv_data_loader
         self.adv = adv
+
+        #准备训练模型
         if adv:
             self.adv_cost = nn.CrossEntropyLoss()
             self.sen_cost = nn.CrossEntropyLoss()
             self.d = d
-            self.d.cuda()
+            self.d.cuda()# 不应该在这里tocuda
             self.sen_d = sen_d
             self.sen_d.cuda()
+
+        # 准备训练优化器（放到了train阶段）
 
     def __load_model__(self, ckpt):
         '''
@@ -170,15 +175,16 @@ class FewShotREFramework:
                 optimizer = torch.optim.SGD(parameters_to_optimize, lr=learning_rate)
             else:
                 optimizer = AdamW(parameters_to_optimize, lr=learning_rate, correct_bias=False)
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
+                                                        num_training_steps=train_iter)
 
             # @jinhui 疑惑:这里不会导致parameters_to_optimize和多个optimizer绑定吗?
             if self.adv:
                 optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)# 应该只限制到
 
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
-                                                        num_training_steps=train_iter)
         else:
             optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
+            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
 
             if self.adv:
                 not_upgrade_params = ["fc.weight", "fc.bias"]  # 怎么知道这两参数不用更新的
@@ -188,7 +194,7 @@ class FewShotREFramework:
                     else:
                         param.requires_grad = True
                 optimizer_encoder = pytorch_optim(model.parameters(), lr=adv_enc_lr)
-            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
+
 
         if self.adv:
             optimizer_dis = pytorch_optim(self.d.parameters(), lr=adv_dis_lr)
@@ -229,15 +235,16 @@ class FewShotREFramework:
                     support[k] = support[k].cuda()
                 for k in query:
                     query[k] = query[k].cuda()
-                label = label.cuda()
 
-            # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
-            logits, pred = model(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
+                label = label.cuda()
             # 重构graphFeature
             support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
             graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
 
-            graphFeatureRcon = model.graphFeatureRecon(graphFeature)
+            # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
+            logits, pred = model.forward_postBERT_newGraph(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
+            graphFeatureRcon = model.getGraphFeatureRecon()
+
             loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.5 #可能影响太大了
 
             loss = model.loss(logits, label) / float(grad_iter)
@@ -256,6 +263,9 @@ class FewShotREFramework:
                 scheduler.step()
                 optimizer.zero_grad()
             # @jinhui 疑惑: 感觉上面流程已经结束, 为什么还要对抗?
+
+
+            # TODO 对抗训练
             if self.adv and it > pretrain_step:  # 对抗策略
                 support_adv = next(self.adv_data_loader)  # 拿
                 if torch.cuda.is_available():
@@ -263,7 +273,7 @@ class FewShotREFramework:
                         support_adv[k] = support_adv[k].cuda()
 
                 # 这样会使得你的sentence encoder之时encode出领域不变特征。而忽略了领域特定特征 #@jinhui 书写建议是写入到DaProtoNet内部
-                features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)
+                features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)# 这里选这从新forward（没必要学KIONG那样增加了强耦合，只为了减少一次forward）
                 features_adv, _ = model.sentence_encoder(support_adv)
                 support_total = features_ori.size(0)
                 features = torch.cat([features_ori, features_adv], 0)  # 上下拼接
@@ -272,13 +282,16 @@ class FewShotREFramework:
                                         torch.ones((total // 2)).long().cuda()], 0)
                 # @jinhui 如果support_total 为基数会发生什么? 虽然这里way = 2 是不会发生的
                 sentiment_labels = torch.cat([torch.zeros((support_total // 2)).long().cuda(),
-                                              torch.ones((support_total // 2)).long().cuda()], 0)
+                                              torch.ones((support_total // 2)).long().cuda()], 0)# 这里的acc一直很差
 
-                dis_logits = self.d(features)
+
+                dis_logits = self.d(features)#d内部含有梯度反转层
                 sen_logits = self.sen_d(features_ori)# 这里貌似有点问题，不应该是这里可以分辨情绪
                 loss_dis = self.adv_cost(dis_logits, dis_labels)
-                # print(loss_dis) # tensor(0.7033, device='cuda:0', grad_fn=<NllLossBackward>)
                 sen_loss_dis = self.sen_cost(sen_logits, sentiment_labels)
+
+
+
                 _, pred = dis_logits.max(-1)
                 _, sen_pred = sen_logits.max(-1)
                 right_dis = float((pred == dis_labels).long().sum()) / float(total)

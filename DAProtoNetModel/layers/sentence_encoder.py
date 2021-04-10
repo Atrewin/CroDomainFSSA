@@ -195,14 +195,18 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
         # TODO jinhui
         # graph feature map
         # encoder
-        self.g1 = nn.Linear(graphFeature_size, hidden_size)
+        self.graphFeaturetransfer = nn.Sequential(
+            nn.Linear(graphFeature_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size * 2),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(hidden_size * 2, hidden_size))
         self.g1_drop = nn.Dropout()
 
 
 
     def forward(self, inputs):
         in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
-        sp_x = self.g1(self.getGraphFeature(inputs))
+        sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
 
         return in_x[:,1,:], sp_x
 
@@ -229,55 +233,50 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
         return inputs["graphFeature"]
 
 
-class RobertaPAIRSentenceEncoder(nn.Module):
-
-    def __init__(self, pretrain_path, max_length): 
+class RobertaNewgraphSentenceEncoder_old(nn.Module):
+    def __init__(self, pretrain_path,checkpoint_name, max_length, graphFeature_size=100, hidden_size=768, cat_entity_rep=False):
         nn.Module.__init__(self)
-        self.roberta = RobertaForSequenceClassification.from_pretrained(
-                pretrain_path,
-                num_labels=2)
+        # 也可以考虑直接取Bert CSL 和SLP的方案
+        from fairseq.models.roberta import RobertaModel
+        self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+
         self.max_length = max_length
-        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        self.cat_entity_rep = cat_entity_rep
+
+        # TODO jinhui
+        # graph feature map
+        # encoder
+        self.graphFeaturetransfer = nn.Sequential(
+            nn.Linear(graphFeature_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size * 2),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(hidden_size * 2, hidden_size))
+        self.g1_drop = nn.Dropout()
 
     def forward(self, inputs):
-        x = self.roberta(inputs['word'], attention_mask=inputs['mask'])[0]
-        return x
-    
-    def tokenize(self, raw_tokens, pos_head, pos_tail):
-        def getIns(bped, bpeTokens, tokens, L):
-            resL = 0
-            tkL = " ".join(tokens[:L])
-            bped_tkL = " ".join(self.tokenizer.tokenize(tkL))
-            if bped.find(bped_tkL) == 0:
-                resL = len(bped_tkL.split())
-            else:
-                tkL += " "
-                bped_tkL = " ".join(self.tokenizer.tokenize(tkL))
-                if bped.find(bped_tkL) == 0:
-                    resL = len(bped_tkL.split())
-                else:
-                    raise Exception("Cannot locate the position")
-            return resL
+        in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
+        sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
 
-        s = " ".join(raw_tokens)
-        sst = self.tokenizer.tokenize(s)
-        headL = pos_head[0]
-        headR = pos_head[-1] + 1
-        hiL = getIns(" ".join(sst), sst, raw_tokens, headL)
-        hiR = getIns(" ".join(sst), sst, raw_tokens, headR)
+        return in_x[:,1,:], sp_x
 
-        tailL = pos_tail[0]
-        tailR = pos_tail[-1] + 1
-        tiL = getIns(" ".join(sst), sst, raw_tokens, tailL)
-        tiR = getIns(" ".join(sst), sst, raw_tokens, tailR)
 
-        E1b = 'madeupword0000'
-        E1e = 'madeupword0001'
-        E2b = 'madeupword0002'
-        E2e = 'madeupword0003'
-        ins = [(hiL, E1b), (hiR, E1e), (tiL, E2b), (tiR, E2e)]
-        ins = sorted(ins)
-        for i in range(0, 4):
-            sst.insert(ins[i][0] + i, ins[i][1])
-        indexed_tokens = self.tokenizer.convert_tokens_to_ids(sst)
-        return indexed_tokens 
+
+    def tokenize(self, raw_tokens):
+        # token -> index #查看到raw_tokens本身有CLS
+
+        tokens = 'CLS'
+        for token in raw_tokens:
+            tokens += " " + token
+        indexed_tokens = self.in_roberta.encode(tokens).tolist()
+
+
+        # padding
+        while len(indexed_tokens) < self.max_length:
+            indexed_tokens.append(2)#该用什么填充呢？
+        indexed_tokens = indexed_tokens[:self.max_length]
+
+        return indexed_tokens
+
+    def getGraphFeature(self, inputs):
+        # 直接返回的方案
+        return inputs["graphFeature"]

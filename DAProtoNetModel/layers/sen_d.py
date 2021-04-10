@@ -17,14 +17,14 @@ class Sen_Discriminator(nn.Module):
             nn.Linear(int(hidden_size/8)*2, int(hidden_size/16)),
             nn.ReLU(),
             nn.Dropout(),
-            nn.Linear(hidden_size, 2)
+            nn.Linear(int(hidden_size/16), 2)
         )
 
 
     def forward(self, x):
-        x = self.sentimentClass(x)
+        logits = self.sentimentClass(x)
 
-        logits = self.fc2(x)
+
         return logits
 
 

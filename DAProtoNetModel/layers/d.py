@@ -30,7 +30,7 @@ class Discriminator(nn.Module):
 
         self.ReverseLayerF = ReverseLayerF()
 
-    def forward(self, x):
+    def forward(self, x, alpha):
         x = ReverseLayerF.apply(x, alpha)
         x = self.fc1(x)
         x = self.relu1(x)

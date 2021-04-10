@@ -61,7 +61,18 @@ class FewRelDataset(data.Dataset):
         return 1000000000
 
 
+def getDatesetFilePath(root, name):
+    if "book" in name:
+        name = "books/" + name
+    elif "dvd" in name:
+        name = "dvd/" + name
+    elif "ele" in name:
+        name = "electronics/" + name
+    elif "kitchen" in name:
+        name  = "kitchenAndhousewares/" + name
 
+    path = os.path.join(root, name + ".json")
+    return path
 class FewGraphDataset(data.Dataset):
     """
     FewRel Dataset add Graph feature
@@ -70,7 +81,8 @@ class FewGraphDataset(data.Dataset):
 
     def __init__(self, name, encoder, N, K, Q, na_rate, root, isNewGraphFeature=True):
         self.root = root
-        path = os.path.join(root, name + ".json")
+        path = getDatesetFilePath(root, name)
+
         if not os.path.exists(path):
             print("[ERROR] Data file does not exist!")
             assert (0)
@@ -207,16 +219,6 @@ def collate_fn_pair(data):
     batch_label = torch.tensor(batch_label)
     return batch_set, batch_label
 
-def get_loader_pair(name, encoder, N, K, Q, batch_size, 
-        num_workers=8, collate_fn=collate_fn_pair, na_rate=0, root='./data/domain_data/processed_data', encoder_name='bert'):
-    dataset = FewRelDatasetPair(name, encoder, N, K, Q, na_rate, root, encoder_name)
-    data_loader = data.DataLoader(dataset=dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            pin_memory=True,
-            num_workers=num_workers,
-            collate_fn=collate_fn)
-    return iter(data_loader)
 
 
 class FewRelUnsupervisedDataset(data.Dataset):
@@ -225,7 +227,8 @@ class FewRelUnsupervisedDataset(data.Dataset):
     """
     def __init__(self, name, encoder, N, K, Q, na_rate, root):
         self.root = root
-        path = os.path.join(root, name + ".json")
+        path = getDatesetFilePath(root, name)
+
         if not os.path.exists(path):
             print("[ERROR] Data file does not exist!")
             assert(0)
@@ -241,18 +244,31 @@ class FewRelUnsupervisedDataset(data.Dataset):
         word= self.encoder.tokenize(item['tokens'])
         return word
 
-    def __additem__(self, d, word):
+    def __additem__(self, d, word, graphFeature):
         d['word'].append(word)
+        #@jinhui
+        d['graphFeature'].append(torch.tensor([0] * 100).type(torch.FloatTensor))  # 为了和label数据统一， 又不想花时间查结果
+    def getGraphFeature(self):
+
+
+        pass
+
 
     def __getitem__(self, index):
         total = self.N * self.K   # 获取 support set共有的样本个数作为domain classifier的输入
-        support_set = {'word': []}
+        support_set = {'word': [],
+                       'graphFeature':[]
+                       }
 
         indices = np.random.choice(list(range(len(self.json_data))), total, False)
         for j in indices:
             word = self.__getraw__(self.json_data[j])   # 下标化
             word = torch.tensor(word).long()
-            self.__additem__(support_set, word)
+
+            graphFeature  = self.getGraphFeature()
+            self.__additem__(support_set, word, graphFeature)
+
+
 
         return support_set
     
@@ -261,7 +277,9 @@ class FewRelUnsupervisedDataset(data.Dataset):
 
 
 def collate_fn_unsupervised(data):
-    batch_support = {'word': []}
+    batch_support = {'word': [],
+                     "graphFeature":[]
+                     }
     support_sets = data
     for i in range(len(support_sets)):
         for k in support_sets[i]:

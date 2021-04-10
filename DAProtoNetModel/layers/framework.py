@@ -179,21 +179,21 @@ class FewShotREFramework:
                                                         num_training_steps=train_iter)
 
             # @jinhui 疑惑:这里不会导致parameters_to_optimize和多个optimizer绑定吗?
-            if self.adv:
-                optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)# 应该只限制到
+            # if self.adv:
+            #     optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)# 应该只限制到
 
         else:
             optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
 
-            if self.adv:
-                not_upgrade_params = ["fc.weight", "fc.bias"]  # 怎么知道这两参数不用更新的
-                for name, param in model.named_parameters():  # 指针对象?
-                    if name in not_upgrade_params:
-                        param.requires_grad = False
-                    else:
-                        param.requires_grad = True
-                optimizer_encoder = pytorch_optim(model.parameters(), lr=adv_enc_lr)
+            # if self.adv:
+            #     not_upgrade_params = ["fc.weight", "fc.bias"]  # 怎么知道这两参数不用更新的
+            #     for name, param in model.named_parameters():  # 指针对象?
+            #         if name in not_upgrade_params:
+            #             param.requires_grad = False
+            #         else:
+            #             param.requires_grad = True
+            #     optimizer_encoder = pytorch_optim(model.parameters(), lr=adv_enc_lr)
 
 
         if self.adv:
@@ -255,7 +255,7 @@ class FewShotREFramework:
                     scaled_loss.backward()
                 # torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 10)
             else:
-                loss.backward()
+                loss.backward(retain_graph=True)
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
 
             if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
@@ -273,8 +273,8 @@ class FewShotREFramework:
                         support_adv[k] = support_adv[k].cuda()
 
                 # 这样会使得你的sentence encoder之时encode出领域不变特征。而忽略了领域特定特征 #@jinhui 书写建议是写入到DaProtoNet内部
-                features_ori, _ = model.sentence_encoder(support)  # (B*2*K, hidden_size)# 这里选这从新forward（没必要学KIONG那样增加了强耦合，只为了减少一次forward）
-                features_adv, _ = model.sentence_encoder(support_adv)
+                features_ori = model.sentence_encoder.module.in_roberta.extract_features(support['word'])[:,1,:]  # (B*2*K, hidden_size)# 这里选这从新forward（没必要学KIONG那样增加了强耦合，只为了减少一次forward）
+                features_adv = model.sentence_encoder.module.in_roberta.extract_features(support_adv['word'])[:,1,:]
                 support_total = features_ori.size(0)
                 features = torch.cat([features_ori, features_adv], 0)  # 上下拼接
                 total = features.size(0)  #
@@ -285,45 +285,55 @@ class FewShotREFramework:
                                               torch.ones((support_total // 2)).long().cuda()], 0)# 这里的acc一直很差
 
 
-                dis_logits = self.d(features)#d内部含有梯度反转层
+                dis_logits = self.d(features, alpha=0.5)#d内部含有梯度反转层
                 sen_logits = self.sen_d(features_ori)# 这里貌似有点问题，不应该是这里可以分辨情绪
                 loss_dis = self.adv_cost(dis_logits, dis_labels)
                 sen_loss_dis = self.sen_cost(sen_logits, sentiment_labels)
 
-
+                sum_loss = loss_dis + sen_loss_dis*2
+                sum_loss.backward(retain_graph=True)
+                optimizer_dis.step()
+                optimizer_sen_dis.step()
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+                optimizer_dis.zero_grad()
+                optimizer_sen_dis.zero_grad()
 
                 _, pred = dis_logits.max(-1)
                 _, sen_pred = sen_logits.max(-1)
                 right_dis = float((pred == dis_labels).long().sum()) / float(total)
                 sen_right_dis = float((sen_pred == sentiment_labels).long().sum()) / float(support_total)
 
-                loss_dis.backward(retain_graph=True)
-                optimizer_dis.step()  # 改变了模型参数, 导致后面的loss_encoder.backward 出现了 inplace operater
-                optimizer_dis.zero_grad()
-                optimizer_encoder.zero_grad()
-                optimizer_sen_dis.zero_grad()
-                optimizer.zero_grad()
 
-                sen_loss_dis.backward(retain_graph=True)
-                optimizer_sen_dis.step()
 
-                optimizer_sen_dis.zero_grad()
-                optimizer_dis.zero_grad()
-                # optimizer_encoder.zero_grad()#@jinhui 改 应该同步优化  所以它的loss先不清零
-                optimizer.zero_grad()
-
-                # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
-                dis_logits = self.d(features)  # @jinhui features要是保持之前的in_spect的梯度跟踪吗？
-                loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)  # # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
-                # print(loss_encoder)# tensor(0.6985, device='cuda:0', grad_fn=<NllLossBackward>)
-                loss_encoder.backward(retain_graph=True)  # torch 上面的loss_dis可以通过
-                # 可能的原因是，forward 和 backward前后有torch被inplace operarion 了
-                # .data 与 .detach()中可能在1.7版本中梯度的检查是不一样的
-                optimizer_encoder.step()  # 现在这里还包含最开始的loss 梯度在, 不知道要不要改，预计sent_acc会提高到80%以上
-                optimizer_dis.zero_grad()
-                optimizer_encoder.zero_grad()
-                optimizer_sen_dis.zero_grad()
-                optimizer.zero_grad()
+                # loss_dis.backward(retain_graph=True)
+                # optimizer_dis.step()  # 改变了模型参数, 导致后面的loss_encoder.backward 出现了 inplace operater
+                # optimizer_dis.zero_grad()
+                # # optimizer_encoder.zero_grad()
+                # optimizer_sen_dis.zero_grad()
+                # optimizer.zero_grad()
+                #
+                # sen_loss_dis.backward(retain_graph=True)
+                # optimizer_sen_dis.step()
+                #
+                # optimizer_sen_dis.zero_grad()
+                # optimizer_dis.zero_grad()
+                # # optimizer_encoder.zero_grad()#@jinhui 改 应该同步优化  所以它的loss先不清零
+                # optimizer.zero_grad()
+                #
+                # # 不同label [1, 0], 目的是为了得到的表示feature无法区分domain, 也因此right_dis的准确率处于50%上下浮动
+                # dis_logits = self.d(features)  # @jinhui features要是保持之前的in_spect的梯度跟踪吗？
+                # loss_encoder = self.adv_cost(dis_logits, 1 - dis_labels)  # # 这里已经不能够使用了, 原因是计算dis_logits的模型参数已经变化
+                # # print(loss_encoder)# tensor(0.6985, device='cuda:0', grad_fn=<NllLossBackward>)
+                # loss_encoder.backward(retain_graph=True)  # torch 上面的loss_dis可以通过
+                # # 可能的原因是，forward 和 backward前后有torch被inplace operarion 了
+                # # .data 与 .detach()中可能在1.7版本中梯度的检查是不一样的
+                # optimizer_encoder.step()  # 现在这里还包含最开始的loss 梯度在, 不知道要不要改，预计sent_acc会提高到80%以上
+                # optimizer_dis.zero_grad()
+                # optimizer_encoder.zero_grad()
+                # optimizer_sen_dis.zero_grad()
+                # optimizer.zero_grad()
 
                 iter_loss_dis += self.item(loss_dis.data)
                 iter_right_dis += right_dis

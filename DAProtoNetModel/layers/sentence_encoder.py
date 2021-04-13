@@ -22,17 +22,29 @@ class CNNSentenceEncoder(nn.Module):
         self.max_length = max_length
         self.embedding = network.embedding.Embedding(word_vec_mat, max_length,
                 word_embedding_dim, pos_embedding_dim)
-        self.in_encoder = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域不变特征
-        self.sp_encoder = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域特定特征
+        self.in_cnn = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域不变特征
+        self.sp_cnn = network.encoder.Encoder(max_length, word_embedding_dim, pos_embedding_dim, hidden_size)  # 编码领域特定特征
         self.drop = nn.Dropout(0.2)
         self.word2id = word2id
-
+        self.in_encoder = self._in_encoder
+        self.sp_encoder = self._sp_encoder
     def forward(self, inputs):
+
+        in_x = self._in_encoder(inputs["word"])
+        sp_x = self._sp_encoder(inputs["word"])
+        return in_x, sp_x
+
+    def _in_encoder(self, inputs):
         x = self.embedding(inputs)
         x = self.drop(x)
-        in_x = self.in_encoder(x)
-        sp_x = self.sp_encoder(x)
-        return in_x, sp_x
+        in_x = self.in_cnn(x)
+        return in_x
+
+    def _sp_encoder(self, inputs):
+        x = self.embedding(inputs)
+        x = self.drop(x)
+        sp_x = self.sp_cnn(x)
+        return sp_x
 
     def tokenize(self, raw_tokens):
         # token -> index
@@ -62,7 +74,8 @@ class BERTSentenceEncoder(nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.cat_entity_rep = cat_entity_rep
         self.mask_entity = mask_entity
-
+        self.in_encoder = self._in_encoder
+        self.sp_encoder = self._sp_encoder
         self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
         self.sp_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
         # self.drop = nn.Dropout(0.2)
@@ -74,11 +87,19 @@ class BERTSentenceEncoder(nn.Module):
         # in_x = self.in_cnn_encoder(word_embed)
         # sp_x = self.sp_cnn_encoder(word_embed)
         # 方式二
-        _, in_x = self.in_bert(inputs['word'])
-        _, sp_x = self.sp_bert(inputs['word'])
+        in_x = self._in_encoder(inputs)# 是因为后面需要多态调用才增加的封装
+        sp_x = self._sp_encoder(inputs)
         # in_x = self.drop(in_x)
         # sp_x = self.drop(sp_x)
         return in_x, sp_x
+
+    def _in_encoder(self,inputs):
+        _, in_x = self.in_bert(inputs['word'])
+        return in_x
+
+    def _sp_encoder(self, inputs):
+        _, sp_x = self.sp_bert(inputs['word'])
+        return sp_x
 
     def tokenize(self, raw_tokens):
         # token -> index
@@ -94,6 +115,8 @@ class BERTSentenceEncoder(nn.Module):
         indexed_tokens = indexed_tokens[:self.max_length]
 
         return indexed_tokens
+
+
 
 
 class BERTPAIRSentenceEncoder(nn.Module):
@@ -135,6 +158,8 @@ class RobertaSentenceEncoder(nn.Module):
         # self.tokenizer = 直接只用in_roberta内置的方法 具体查看fairseq 的接口
         self.cat_entity_rep = cat_entity_rep
 
+        self.in_encoder = self._in_encoder
+        self.sp_encoder = self._sp_encoder
         # 后面的Bert特征怎么取到的问题
         # CNN的方案 如果不用那么就没必要增加GPU负担
         # self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
@@ -156,14 +181,23 @@ class RobertaSentenceEncoder(nn.Module):
         #
         # return in_x, sp_x
         # # 方式二
-        in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
-        sp_x = self.sp_roberta.extract_features(inputs['word'])
-        return in_x[:,1,:], sp_x[:,1,:]
+        in_x = self._in_encoder(inputs)#B, S_N ,D
+        sp_x = self._sp_encoder(inputs)
+        return in_x, sp_x
 
         # # 方案三 调用分类器
         # in_x = self.in_roberta.predict('emb_sentence',inputs['word'])#B, D
         # sp_x = self.sp_roberta.predict('emb_sentence', inputs['word'])
         # return  in_x, sp_x # 4,768
+
+    def _in_encoder(self,inputs):
+        in_x = self.in_roberta.extract_features(inputs['word'])[:, 1, :]  # B, S_N ,D
+        return in_x
+
+    def _sp_encoder(self,inputs):
+        sp_x = self.sp_roberta.extract_features(inputs['word'])[:, 1, :]
+        return  sp_x
+
 
     def tokenize(self, raw_tokens):
         # token -> index #查看到raw_tokens本身有CLS
@@ -192,6 +226,8 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
         self.max_length = max_length
         self.cat_entity_rep = cat_entity_rep
 
+        self.in_encoder = self._in_encoder
+        self.sp_encoder = self._sp_encoder
         # TODO jinhui
         # graph feature map
         # encoder
@@ -205,13 +241,17 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
 
 
     def forward(self, inputs):
-        in_x = self.in_roberta.extract_features(inputs['word'])#B, S_N ,D
+        in_x = self._in_encoder(inputs)#B, S_N ,D
         sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
 
-        return in_x[:,1,:], sp_x
+        return in_x, sp_x
 
-
-
+    def _in_encoder(self, inputs):
+        in_x = self.in_roberta.extract_features(inputs['word'])[:,1,:]  # B, S_N ,D
+        return in_x
+    def _sp_encoder(self,inputs):
+        sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
+        return sp_x
     def tokenize(self, raw_tokens):
         # token -> index #查看到raw_tokens本身有CLS
 
@@ -238,7 +278,7 @@ class RobertaNewgraphSentenceEncoder_old(nn.Module):
         nn.Module.__init__(self)
         # 也可以考虑直接取Bert CSL 和SLP的方案
         from fairseq.models.roberta import RobertaModel
-        self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+        self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)# 差异性需要有，但是功能需要用接口封装（相同的函数）
 
         self.max_length = max_length
         self.cat_entity_rep = cat_entity_rep

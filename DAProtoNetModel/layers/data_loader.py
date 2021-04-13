@@ -33,7 +33,7 @@ class FewRelDataset(data.Dataset):
         d['word'].append(word)
 
     def __getitem__(self, index):
-        target_classes = ["neg", "pos"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
+        target_classes = ["pos", "neg"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
         support_set = {'word': []}
         query_set = {'word': []}
         query_label = []
@@ -119,11 +119,11 @@ class FewGraphDataset(data.Dataset):
 
     def __getitem__(self, index):
         try:# 有些样本缺失了graphFeature
-            target_classes = ["neg", "pos"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
+            target_classes = ["pos", "neg"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
             support_set = {'word': [], "graphFeature": []}
             query_set = {'word': [], "graphFeature": []}
             query_label = []
-
+            support_label = []
             for i, class_name in enumerate(target_classes):
                 indices = np.random.choice(
                     list(range(len(self.json_data[class_name]))),
@@ -138,17 +138,18 @@ class FewGraphDataset(data.Dataset):
 
                     if count < self.K:
                         self.__additem__(support_set, word, graphFeature)
+
                     else:
                         self.__additem__(query_set, word, graphFeature)
                     count += 1
-
+                support_label += [i] * self.K
                 query_label += [i] * self.Q
         except:
             index = random.randint(0,self.__len__())
-            support_set, query_set, query_label = self.__getitem__(index)
+            support_set, query_set, query_label, support_label = self.__getitem__(index)
 
 
-        return support_set, query_set, query_label
+        return support_set, query_set, query_label, support_label
 
     def __len__(self):
         return 1000000000
@@ -176,19 +177,25 @@ def collate_fn(data):
     batch_support = {'word': [], "graphFeature":[]}
     batch_query = {'word': [], "graphFeature":[]}
     batch_label = []
-    support_sets, query_sets, query_labels = zip(*data)
-    for i in range(len(support_sets)):
-        for k in support_sets[i]:
+    batch_support_lsbels = []
+    support_sets, query_sets, query_labels,  support_lsbels= zip(*data)
+    for i in range(len(support_sets)):# i = batch
+        for k in support_sets[i]:# k = ["word", "graphFeature"]
             batch_support[k] += support_sets[i][k]
         for k in query_sets[i]:
             batch_query[k] += query_sets[i][k]
+
         batch_label += query_labels[i]
+        batch_support_lsbels += support_lsbels[i]
+
     for k in batch_support:
         batch_support[k] = torch.stack(batch_support[k], 0)
     for k in batch_query:
         batch_query[k] = torch.stack(batch_query[k], 0)
+    # @jinhui 个人感觉不应该在这里就变为tensor
     batch_label = torch.tensor(batch_label)
-    return batch_support, batch_query, batch_label
+    batch_support_lsbels = torch.tensor(batch_support_lsbels)
+    return batch_support, batch_query, batch_label, batch_support_lsbels
 
 
 def get_loader(name, encoder, N, K, Q, batch_size, 
@@ -248,6 +255,7 @@ class FewRelUnsupervisedDataset(data.Dataset):
         d['word'].append(word)
         #@jinhui
         d['graphFeature'].append(torch.tensor([0] * 100).type(torch.FloatTensor))  # 为了和label数据统一， 又不想花时间查结果
+        return d
     def getGraphFeature(self):
 
 
@@ -266,7 +274,7 @@ class FewRelUnsupervisedDataset(data.Dataset):
             word = torch.tensor(word).long()
 
             graphFeature  = self.getGraphFeature()
-            self.__additem__(support_set, word, graphFeature)
+            support_set = self.__additem__(support_set, word, graphFeature)# 真的是传引用吗？
 
 
 

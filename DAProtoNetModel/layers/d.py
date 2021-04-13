@@ -14,7 +14,8 @@ class ReverseLayerF(Function):
     @staticmethod
     def backward(ctx, grad_output):
 
-        output = grad_output * ctx.alpha #@jinhui 为了尝试学习领域特有信息
+        # output = grad_output.neg() * ctx.alpha #@jinhui 去掉.neg() 可以尝试学习领域特有信息
+        output = grad_output * ctx.alpha
         return output, None
 
 class Discriminator(nn.Module):

@@ -17,6 +17,7 @@ class DAProtoNet(framework.FewShotREModel):
         self.drop = nn.Dropout()
         self.dot = dot
         self.fc = nn.Linear(hidden_size*2, hidden_size)
+        self.CrossEntropyLoss = nn.CrossEntropyLoss()
 
         # TODO jinhui
         # graph feature map
@@ -46,13 +47,17 @@ class DAProtoNet(framework.FewShotREModel):
     def getGraphFeature(self,support, query):
         support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
         return support_graphFeature, query_graphFeature
-    def getGraphFeatureRecon(self):
-        return self.reconGraphFeature
+    # def getGraphFeatureRecon(self):
+    #     return self.reconGraphFeature
 
     def loss_recon(self, recon_x, x):
         dim = x.size(1)
-        MSE = F.mse_loss(recon_x, x.view(-1, dim), reduction='mean')
-        return MSE
+        # MSE = F.mse_loss(recon_x, x.view(-1, dim), reduction='mean')
+                        # CEL = F.cross_entropy(recon_x, x.view(-1, dim), reduction='mean')# 因为recon_x是小数，并不是分类结果，所以不可以使用cross_entropy
+                        # CEL = self.CrossEntropyLoss(recon_x, x)
+        cosine = torch.cosine_similarity(recon_x, x.view(-1, dim), dim=1)
+        CSD = torch.mean(cosine, 0)
+        return CSD
 
 
     def forward(self, support, query, N, K, total_Q):
@@ -116,7 +121,7 @@ class DAProtoNet(framework.FewShotREModel):
 
         return logits, pred
 
-    def forward_postBERT_newGraph(self, support, query, N, K, total_Q):
+    def forwardWithRecon(self, support, query, N, K, total_Q):
         in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
         in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
         hidden_size = in_support_emb.size(-1)
@@ -144,8 +149,7 @@ class DAProtoNet(framework.FewShotREModel):
         support_graphFeature, query_graphFeature = sp_support_emb, sp_query_emb
         graphFeature_map = torch.cat([support_graphFeature, query_graphFeature], 0)
         reconGraphFeature = self.graphFeatureRecon(graphFeature_map)
-        self.reconGraphFeature = reconGraphFeature
 
-        return logits, pred
+        return logits, pred, reconGraphFeature
 
 

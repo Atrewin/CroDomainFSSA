@@ -7,7 +7,7 @@ from DAProtoNetModel.layers.sentence_encoder import *
 from DAProtoNetModel.layers.DAProtoNet import DAProtoNet
 from DAProtoNetModel.layers.d import Discriminator
 from DAProtoNetModel.layers.sen_d import Sen_Discriminator
-
+import traceback
 
 def main():
 
@@ -25,7 +25,6 @@ def main():
     parser.add_argument('--K', default=1, type=int, help='K shot')
     parser.add_argument('--Q', default=1, type=int, help='Num of query per class')
     parser.add_argument('--batch_size', default=4, type=int, help='batch size')
-    parser.add_argument('--pretrain_step', default=500, type=int, help="pretrain_step")
     parser.add_argument('--train_iter', default=30000, type=int, help='num of iters in training')
     parser.add_argument('--val_iter', default=1000, type=int, help='num of iters in validation')
     parser.add_argument('--test_iter', default=10000, type=int, help='num of iters in testing')
@@ -58,6 +57,12 @@ def main():
     # experiment
     parser.add_argument('--mask_entity', action='store_true', help='mask entity names')
     parser.add_argument('--use_sgd_for_bert', action='store_true', help='use SGD instead of AdamW for BERT.')
+
+
+    # 切分时间设计
+    parser.add_argument('--start_train_prototypical', default=-1 , type=int, help='iter to start train prototypical')
+    parser.add_argument('--start_train_adv', default=500, type=int, help="iter to start add adv")
+    parser.add_argument('--start_train_dis', default=-1, type=int, help='iter to start train discriminator.')
 
     opt = parser.parse_args()
     trainN = opt.trainN
@@ -119,34 +124,37 @@ def main():
 
     if torch.cuda.is_available():
         model.cuda()# 疑问 这一句有成功tocuda吗？
-
-    if not opt.only_test:
-        if encoder_name in ['bert', 'roberta', "roberta_newGraph"]:
-            bert_optim = True
-        else:
-            bert_optim = False
-
-        if opt.lr == -1:
-            if bert_optim:
-                opt.lr = 2e-5
+    try:
+        if not opt.only_test:
+            if encoder_name in ['bert', 'roberta', "roberta_newGraph"]:
+                bert_optim = True
             else:
-                opt.lr = 1e-1
-        # @jinhui 这里的传参模式不符合面向对象程序设计思想, 建议作为属性成员传入framework
-        framework.train(model, prefix, batch_size, trainN, N, K, Q, pretrain_step=opt.pretrain_step,
-                pytorch_optim=pytorch_optim, load_ckpt=opt.load_ckpt, save_ckpt=ckpt,
-                na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,
-                train_iter=opt.train_iter, val_iter=opt.val_iter, bert_optim=bert_optim, 
-                learning_rate=opt.lr, use_sgd_for_bert=opt.use_sgd_for_bert)
-    else:
-        ckpt = opt.load_ckpt
-        if ckpt is None:
-            print("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
-            ckpt = 'none'
+                bert_optim = False
+
+            if opt.lr == -1:
+                if bert_optim:
+                    opt.lr = 2e-5
+                else:
+                    opt.lr = 1e-1
+            # @jinhui 这里的传参模式不符合面向对象程序设计思想, 建议作为属性成员传入framework
+            framework.train(model, prefix, batch_size, trainN, N, K, Q,
+                    pytorch_optim=pytorch_optim, load_ckpt=opt.load_ckpt, save_ckpt=ckpt,
+                    na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,
+                    train_iter=opt.train_iter, val_iter=opt.val_iter, bert_optim=bert_optim,
+                    learning_rate=opt.lr, use_sgd_for_bert=opt.use_sgd_for_bert, opt=opt)
+        else:
+            ckpt = opt.load_ckpt
+            if ckpt is None:
+                print("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
+                ckpt = 'none'
+    except:# 提前中断，执行最终测试
+
+        print(traceback.print_exc())
+        acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)
+        print("RESULT: %.2f" % (acc * 100))
 
     acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)
     print("RESULT: %.2f" % (acc * 100))
-
-
 
 if __name__ == "__main__":
     main()

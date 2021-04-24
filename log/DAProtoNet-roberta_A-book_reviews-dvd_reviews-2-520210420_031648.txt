@@ -1,0 +1,7 @@
+2021-04-20 03:16:48,176 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-20 03:16:48,176 INFO    : model: DAProtoNet
+2021-04-20 03:16:48,176 INFO    : encoder: roberta_A
+2021-04-20 03:16:48,176 INFO    : max_length: 200
+2021-04-20 03:17:34,995 INFO    : Start training...
+2021-04-20 03:17:46,475 INFO    : step:    1 | loss: 0.348614, accuracy: 25.00%
+2021-04-20 03:17:46,476 INFO    : Use val dataset

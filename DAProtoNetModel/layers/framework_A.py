@@ -1,15 +1,9 @@
 import os
-import sklearn.metrics
 import numpy as np
 import sys
-import time
-from . import sentence_encoder
-from . import data_loader
 import torch
 from torch import autograd, optim, nn
-from torch.autograd import Variable
-from torch.nn import functional as F
-# from pytorch_pretrained_bert import BertAdam
+
 from transformers import AdamW, get_linear_schedule_with_warmup
 import traceback
 from utils.logger import *
@@ -86,8 +80,8 @@ class FewShotREFramework:
             self.d.cuda()# 不应该在这里tocuda
             self.sen_d = sen_d
             self.sen_d.cuda()
-            self.sen_sp_d = sen_sp_D
-            self.sen_sp_d.cuda()
+            # self.sen_sp_D = sen_sp_D
+            # self.sen_sp_D.cuda()
 
         # 准备训练优化器（放到了train阶段）
 
@@ -171,25 +165,8 @@ class FewShotREFramework:
                 {'params': [p for n, p in parameters_to_optimize
                             if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
                 {'params': [p for n, p in parameters_to_optimize
-                            if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+                            if any(nd in n for nd in no_decay)], 'weight_decay': 0.0001}
             ]
-
-            # @改 除了bert 其他模块应该有更高的学习率 @改 0422
-            # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-            # low_lr = ["sentence_encoder"]
-            # # @jinhui 疑问点: 这里为什么要这样设置leanable parameters weight_decay
-            # parameters_to_optimize = [
-            #     {'params': [p for n, p in parameters_to_optimize
-            #                 if (not any(nd in n for nd in no_decay)) and (any(low in n for low in low_lr))], 'weight_decay': 0.01},
-            #     {'params': [p for n, p in parameters_to_optimize
-            #                 if any(nd in n for nd in no_decay) and (any(low in n for low in low_lr))], 'weight_decay': 0.0},
-            #     {'params': [p for n, p in parameters_to_optimize
-            #                 if (not any(nd in n for nd in no_decay)) and ( not any(low in n for low in low_lr))],
-            #      'weight_decay': 0.01, 'lr': 1e-1},# bert之外的人应该有更多的学习率
-            #     {'params': [p for n, p in parameters_to_optimize
-            #                 if any(nd in n for nd in no_decay) and (not any(low in n for low in low_lr))],
-            #      'weight_decay': 0.0, 'lr': 1e-1}
-            # ]
 
             # 优化器和参数绑定
             if use_sgd_for_bert:
@@ -219,16 +196,16 @@ class FewShotREFramework:
 
         if self.adv:
             # optimizer_dis = AdamW(self.d.parameters(), lr=adv_dis_lr, correct_bias=False)
-            optimizer_dis = AdamW(self.d.parameters(), lr=adv_dis_lr)
-            optimizer_sen_dis = AdamW(self.sen_d.parameters(), lr=adv_dis_lr)
-            optimizer_sen_dis_sp = AdamW(self.sen_sp_d.parameters(), lr=adv_dis_lr, correct_bias=False)
+            optimizer_dis = pytorch_optim(self.d.parameters(), lr=adv_dis_lr)
+            optimizer_sen_dis = pytorch_optim(self.sen_d.parameters(), lr=adv_dis_lr)
+            # optimizer_sen_dis = AdamW(self.sen_d.parameters(), lr=adv_dis_lr, correct_bias=False)
         if load_ckpt:
             load_ckpt = save_ckpt
             state_dict = self.__load_model__(load_ckpt)['state_dict']
             own_state = model.state_dict()
             for name, param in state_dict.items():
                 if name not in own_state:
-                    logger.info('ignore {}'.format(name))
+                    print('ignore {}'.format(name))
                     continue
                 logger.info('load {} from {}'.format(name, load_ckpt))
                 own_state[name].copy_(param)
@@ -255,6 +232,7 @@ class FewShotREFramework:
         iter_dis = 1
 
         right_dis = 1
+
         for it in range(start_iter, start_iter + train_iter):
 
             support, query, label, support_label = next(self.train_data_loader)
@@ -267,28 +245,19 @@ class FewShotREFramework:
                 label = label.cuda()
                 support_label = support_label.cuda()
             # 重构graphFeature
-            support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
-            graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
-
-            if it > opt.start_train_prototypical:
-                if it == opt.start_train_prototypical + 1:
-                    # logger.info('\n')
-                    pass
+            # support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
+            # graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
+            start_train_sentiment = opt.start_train_prototypical
+            if it > start_train_sentiment:
+                if it == opt.start_train_prototypical + 1:#@改
+                    sys.stdout.write('\n')
                 # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
-                if opt.encoder == "roberta_newGraph":
-                    logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
 
-                    loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.05 #可能影响太大了
+                logits, pred= model(support, query, N_for_train, K,
+                                                                        Q * N_for_train + na_rate * Q)
+                loss = model.loss(logits, support_label) / float(grad_iter)#改
 
-                    loss = model.loss(logits, label)
-                    loss = (loss+ loss_recon) / float(grad_iter)
-                else:
-                    logits, pred= model(support, query, N_for_train, K,
-                                                                            Q * N_for_train + na_rate * Q)
-                    loss = model.loss(logits, label) / float(grad_iter)
-
-                right = model.accuracy(pred, label)
-
+                right = model.accuracy(pred, support_label)
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
@@ -315,19 +284,17 @@ class FewShotREFramework:
             if self.adv and it > opt.start_train_adv:  # < 优先对抗策略 >后对抗策略
 
                 if it == opt.start_train_adv + 1:
-                    # logger.info('\n')
-                    sen_d_alpha = 1
-                    sen_sp_d_alpha = 1
+                    sys.stdout.write('\n')
 
                 # 动态调整对抗的梯度差异
-                if right_dis >= 0.5:# 只有发现差异才需要拉近 @jinhui
+                if iter_right_dis > 0.5:
                     len_dataloader = 1000
                     n_epochs = 10000
                     p = float(it + it * len_dataloader) / n_epochs / len_dataloader
-
                     alpha = 2. / (1. + np.exp(-10 * p)) - 1  # 必须大于0，不然梯度就没有反转了
+
                 else:
-                    alpha = 0.0000000000001
+                    alpha = 0
 
 
 
@@ -340,52 +307,35 @@ class FewShotREFramework:
                 #@jinhui 问题：[:,1,:] 1是否会出问题
                 # 这样会使得你的sentence encoder之时encode出领域不变特征。而忽略了领域特定特征 #@jinhui 书写建议是写入到DaProtoNet内部
                 support_features = model.sentence_encoder(support)  # (B*2*K, hidden_size)# 这里选这从新forward（没必要学KIONG那样增加了强耦合，只为了减少一次forward）
-                features_ori = support_features[0]
-                sp_support_features = support_features[1]
-                features_adv = model.sentence_encoder.module.in_encoder(support_adv)# @jinhui
-                support_total = features_ori.size(0)
-                features = torch.cat([features_ori, features_adv], 0)  # 上下拼接
+                features_adv = model.sentence_encoder(support_adv)# @jinhui
+
+                support_total = support_features.size(0)
+                features = torch.cat([support_features, features_adv], 0)  # 上下拼接
                 total = features.size(0)  #
                 dis_labels = torch.cat([torch.zeros((total // 2)).long().cuda(),
                                         torch.ones((total // 2)).long().cuda()], 0)
                 # @jinhui 如果support_total 为基数会发生什么? 虽然这里way = 2 是不会发生的
                 # sentiment_labels = torch.cat([torch.zeros((support_total // 2)).long().cuda(),
                 #                               torch.ones((support_total // 2)).long().cuda()], 0)# 这里的acc一直很差, 是这里的label没有和真实的label对齐
+
                 sentiment_labels = support_label
-                dis_logits = self.d(features, alpha=alpha)  # d内部含有梯度反转层， 采用动态设计
-                sen_logits = self.sen_d(features_ori, sen_d_alpha)# 这里貌似有点问题，不应该是这里可以分辨情绪
-                sen_logits_sp = self.sen_sp_d(sp_support_features, sen_sp_d_alpha)
+                dis_logits = self.d(features, alpha=alpha)
+                # d内部含有梯度反转层， 采用动态设计
+                sen_logits = model.sentimentClassifier(support_features)# 这里貌似有点问题，不应该是这里可以分辨情绪
 
 
-                # logsoftmax_func = nn.LogSoftmax(dim=1)
-                # dis_logits = logsoftmax_func(dis_logits)
-                # sen_logits = logsoftmax_func(sen_logits)
+
                 loss_dis = self.adv_cost(dis_logits, dis_labels)
                 sen_loss_dis = self.sen_cost(sen_logits, sentiment_labels)# 怎么这么大？没有softmax?
-                sen_loss_sp = self.sen_cost(sen_logits_sp, sentiment_labels)
                 if it > opt.start_train_dis :
 
-                    if it == opt.start_train_dis + 1:#这时候sen loss只更新sen_d
-                        sen_d_alpha = 0
-                        sen_sp_d_alpha = 0
+                    if it == opt.start_train_dis + 1:
+                        sys.stdout.write('\n')
 
-                    sum_loss = (sen_loss_dis + loss_dis + sen_loss_sp) / 3 #20/21# 这里是没办法调节两者比例的，因为优化器是AdamW
+                    sum_loss = (loss_dis + sen_loss_dis*20 )/21 #20/21# 这里是没办法调节两者比例的，因为优化器是AdamW
                 else:
-                    sum_loss = (sen_loss_dis + loss_dis + sen_loss_sp) / 3
+                    sum_loss = sen_loss_dis
                 sum_loss.backward(retain_graph=True)# retain_graph=True
-                if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
-                    optimizer_dis.step()
-                    optimizer_sen_dis.step()
-                    optimizer_sen_dis_sp.step()
-                    optimizer.step()
-
-                    optimizer.zero_grad()
-                    optimizer_dis.zero_grad()
-                    optimizer_sen_dis.zero_grad()
-                    optimizer_sen_dis_sp.zero_grad()
-                    # optimizer_encoder.zero_grad()# s是否想要双优化器想要讨论
-                    torch.cuda.empty_cache()
-
 
 
                 _, pred = dis_logits.max(-1)
@@ -393,18 +343,63 @@ class FewShotREFramework:
                 right_dis = float((pred == dis_labels).long().sum()) / float(total)
                 sen_right_dis = float((sen_pred == sentiment_labels).long().sum()) / float(support_total)
 
+
+                if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
+                    optimizer_dis.step()
+                    # optimizer_encoder.step()
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    optimizer_dis.zero_grad()
+                    # optimizer_encoder.zero_grad()# s是否想要双优化器想要讨论
+                    torch.cuda.empty_cache()
+
+                    # 在单独多训练几次d //会让训练变得很慢
+                    # model.eval()
+                    # for i in range(2):
+                    #     support_adv = next(self.adv_data_loader)  # 拿
+                    #     if torch.cuda.is_available():
+                    #         for k in support_adv:
+                    #             support_adv[k] = support_adv[k].cuda()
+                    #
+                    #     support, query, label, support_label = next(self.train_data_loader)
+                    #     if torch.cuda.is_available():  # @jinhui 疑惑 为什么要分开to cuda
+                    #         for k in support:
+                    #             support[k] = support[k].cuda()
+                    #
+                    #     features_adv = model.sentence_encoder.module.in_encoder(support_adv)
+                    #     support_features = model.sentence_encoder.module.in_encoder(support)
+                    #
+                    #     features = torch.cat([support_features, features_adv], 0)  # 上下拼接
+                    #     total = features.size(0)  #
+                    #     dis_labels = torch.cat([torch.zeros((total // 2)).long().cuda(),
+                    #                             torch.ones((total // 2)).long().cuda()], 0)
+                    #     # @jinhui 如果support_total 为基数会发生什么? 虽然这里way = 2 是不会发生的
+                    #     # sentiment_labels = torch.cat([torch.zeros((support_total // 2)).long().cuda(),
+                    #     #                               torch.ones((support_total // 2)).long().cuda()], 0)# 这里的acc一直很差, 是这里的label没有和真实的label对齐
+                    #     alpha = 2
+                    #     sentiment_labels = support_label
+                    #     dis_logits = self.d(features, alpha=alpha)
+                    #     loss_dis = self.adv_cost(dis_logits, dis_labels)
+                    #
+                    #     loss_dis.backward(retain_graph=True)  # retain_graph=True
+                    #     optimizer_dis.step()
+                    #     optimizer.zero_grad()
+                    #     optimizer_dis.zero_grad()
+                    #     torch.cuda.empty_cache()
+                    # model.train()
+
                 # #TODO sp_encoder sentiment
                 # sp_features = model.sentence_encoder.module.sp_encoder(query)
                 # query_total = sp_features.size(0)
                 # sen_logits_sp = self.sen_d(sp_features)
-                _, sen_pred_sp = sen_logits_sp.max(-1)
-                sen_right_sp = float((sen_pred_sp == sentiment_labels).long().sum()) / float(support_total)
+                # _, sen_pred_sp = sen_logits_sp.max(-1)
+                # sen_right_sp = float((sen_pred_sp == sentiment_labels).long().sum()) / float(support_total)
 
 
                 iter_loss_dis += self.item(loss_dis.data)
                 iter_right_dis += right_dis
                 iter_sen_right_dis += sen_right_dis
-                iter_sen_right_sp += sen_right_sp
+                iter_sen_right_sp += 10#改
                 iter_dis += 1
 
             iter_sample += 1
@@ -425,10 +420,10 @@ class FewShotREFramework:
             sys.stdout.flush()
 
             if (it + 1) % val_step == 0:
-                #log
+
                 if self.adv:
                     logger.info(
-                        'step: {0:4} | loss: {1:2.6f}, accuracy_: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_in_acc: {5:2.6f}, sen_sp_acc: {5:2.6f}'
+                        'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_in_acc: {5:2.6f}, sen_sp_acc: {5:2.6f}'
                         .format(it + 1, iter_loss / iter_proto,
                                 100 * iter_right / iter_proto,
                                 iter_loss_dis / iter_dis,
@@ -437,11 +432,12 @@ class FewShotREFramework:
                                 100 * iter_sen_right_sp / iter_dis, ) + '\r')
                 else:
                     logger.info(
-                        'step: {0:4} | loss: {1:2.6f}, accuracy_: {2:3.2f}%'.format(it + 1, iter_loss / iter_proto,
+                        'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%'.format(it + 1, iter_loss / iter_proto,
                                                                                    100 * iter_right / iter_proto) + '\r')
 
                 acc = self.eval(model, B, N_for_eval, K, Q, val_iter,
                                 na_rate=na_rate)
+
                 model.train()
                 if acc > best_acc:
                     logger.info('Best checkpoint')
@@ -456,7 +452,7 @@ class FewShotREFramework:
                 iter_sample = 0.
                 iter_proto = 1
                 iter_dis = 1
-                logger.info("\n")
+
         logger.info("\n####################\n")
         logger.info("Finish training " + model_name)
 
@@ -476,7 +472,8 @@ class FewShotREFramework:
         ckpt: Checkpoint path. Set as None if using current model parameters.
         return: Accuracy
         '''
-        # print("")
+
+
         model.eval()
         if ckpt is None:
             logger.info("Use val dataset")
@@ -497,14 +494,14 @@ class FewShotREFramework:
         with torch.no_grad():
             for it in range(eval_iter):
                 try:
-                    support, query, label, _ = next(eval_dataset)
+                    support, query, label, support_label = next(eval_dataset)
                     if torch.cuda.is_available():
                         for k in support:
                             support[k] = support[k].cuda()
                         for k in query:
                             query[k] = query[k].cuda()
-                        label = label.cuda()
-                    logits, pred = model(support, query, N, K, Q * N + Q * na_rate)
+                        label = support_label.cuda()#@改
+                    logits, pred = model(support, query, N, K, Q * N + Q * na_rate)# 是只用support
 
                     right = model.accuracy(pred, label)
                     iter_right += self.item(right.data)
@@ -514,8 +511,7 @@ class FewShotREFramework:
                         '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
                     sys.stdout.flush()
                 except RuntimeError:
-                    logger.info(it)
+                    print(it, end="")
                     continue
-            logger.info(
-                        '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
+            logger.info('[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
         return iter_right / iter_sample

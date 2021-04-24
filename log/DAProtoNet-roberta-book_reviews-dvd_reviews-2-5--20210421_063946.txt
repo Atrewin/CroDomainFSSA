@@ -1,0 +1,36 @@
+2021-04-21 06:39:46,323 INFO    : log id: 20210421_063946
+2021-04-21 06:39:46,323 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-21 06:39:46,323 INFO    : model: DAProtoNet
+2021-04-21 06:39:46,324 INFO    : encoder: roberta
+2021-04-21 06:39:46,324 INFO    : max_length: 200
+2021-04-21 06:41:04,362 INFO    : Start training...
+2021-04-21 06:41:04,363 INFO    : Use bert optim!
+2021-04-21 06:50:53,907 INFO    : step: 1000 | loss: 2.075453, accuracy_: 51.55%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 06:50:53,910 INFO    : Use val dataset
+2021-04-21 06:53:03,245 INFO    : [EVAL] step: 1000 | accuracy: 51.60%
+2021-04-21 06:53:03,248 INFO    : Best checkpoint
+2021-04-21 06:53:09,222 INFO    : 
+
+2021-04-21 07:02:11,648 INFO    : step: 2000 | loss: 0.973958, accuracy_: 51.30%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 07:02:11,651 INFO    : Use val dataset
+2021-04-21 07:04:19,689 INFO    : [EVAL] step: 1000 | accuracy: 57.60%
+2021-04-21 07:04:19,691 INFO    : Best checkpoint
+2021-04-21 07:04:24,532 INFO    : 
+
+2021-04-21 07:14:19,945 INFO    : step: 3000 | loss: 0.933222, accuracy_: 49.20%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 07:14:19,947 INFO    : Use val dataset
+2021-04-21 07:16:27,180 INFO    : [EVAL] step: 1000 | accuracy: 58.00%
+2021-04-21 07:16:27,183 INFO    : Best checkpoint
+2021-04-21 07:16:30,342 INFO    : 
+
+2021-04-21 07:25:42,454 INFO    : step: 4000 | loss: 0.918362, accuracy_: 49.15%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 07:25:42,477 INFO    : Use val dataset
+2021-04-21 07:27:50,587 INFO    : [EVAL] step: 1000 | accuracy: 53.20%
+2021-04-21 07:27:50,589 INFO    : 
+
+2021-04-21 07:37:46,996 INFO    : step: 5000 | loss: 0.913401, accuracy_: 50.85%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 07:37:46,999 INFO    : Use val dataset
+2021-04-21 07:39:52,746 INFO    : [EVAL] step: 1000 | accuracy: 68.40%
+2021-04-21 07:39:52,748 INFO    : Best checkpoint
+2021-04-21 07:39:57,265 INFO    : 
+

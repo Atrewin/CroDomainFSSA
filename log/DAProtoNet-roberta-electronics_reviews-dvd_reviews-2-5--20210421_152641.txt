@@ -1,0 +1,5 @@
+2021-04-21 15:26:41,016 INFO    : log id: 20210421_152641
+2021-04-21 15:26:41,017 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-21 15:26:41,017 INFO    : model: DAProtoNet
+2021-04-21 15:26:41,017 INFO    : encoder: roberta
+2021-04-21 15:26:41,017 INFO    : max_length: 200

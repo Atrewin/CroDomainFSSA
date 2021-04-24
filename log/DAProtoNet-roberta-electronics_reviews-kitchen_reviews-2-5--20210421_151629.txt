@@ -1,0 +1,7 @@
+2021-04-21 15:16:29,278 INFO    : log id: 20210421_151629
+2021-04-21 15:16:29,278 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-21 15:16:29,278 INFO    : model: DAProtoNet
+2021-04-21 15:16:29,278 INFO    : encoder: roberta
+2021-04-21 15:16:29,278 INFO    : max_length: 200
+2021-04-21 15:17:21,081 INFO    : Start training...
+2021-04-21 15:17:21,081 INFO    : Use bert optim!

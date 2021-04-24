@@ -6,7 +6,7 @@ import os
 from os.path import normpath,join,dirname
 Base_DIR=normpath(join(os.path.dirname(os.path.abspath(__file__)), '../'))
 sys.path.insert(0,Base_DIR)#添加环境变量，因为append是从列表最后开始添加路径，可能前面路径有重复，最好用sys.path.insert(Base_DIR)从列表最前面开始添加
-
+import numpy as np
 
 def getSentenceEncoder(encoder_name, opt):
 

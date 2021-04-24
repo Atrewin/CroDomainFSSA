@@ -1,0 +1,6 @@
+2021-04-20 05:46:50,018 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-20 05:46:50,018 INFO    : model: DAProtoNet
+2021-04-20 05:46:50,018 INFO    : encoder: roberta_A
+2021-04-20 05:46:50,018 INFO    : max_length: 200
+2021-04-20 05:47:35,926 INFO    : Start training...
+2021-04-20 05:47:35,927 INFO    : Use bert optim!

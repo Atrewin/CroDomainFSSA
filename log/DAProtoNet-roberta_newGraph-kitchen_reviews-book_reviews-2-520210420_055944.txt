@@ -1,0 +1,4 @@
+2021-04-20 05:59:44,328 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-20 05:59:44,328 INFO    : model: DAProtoNet
+2021-04-20 05:59:44,328 INFO    : encoder: roberta_newGraph
+2021-04-20 05:59:44,328 INFO    : max_length: 200

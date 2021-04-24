@@ -2,12 +2,7 @@ import sys
 from os.path import normpath,join,dirname
 # 先引入根目录路径，以后的导入将直接使用当前项目的绝对路径
 sys.path.append(normpath(join(dirname(__file__), '..')))
-import torch
-import torch.nn.functional as F
-import math
-import numpy as np
-import os
-from torch import optim
+
 from . import network
 from transformers import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification, RobertaModel, RobertaTokenizer, RobertaForSequenceClassification
 import torch.nn as nn
@@ -153,6 +148,8 @@ class RobertaSentenceEncoder(nn.Module):
         from fairseq.models.roberta import RobertaModel
         self.in_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
         self.sp_roberta = RobertaModel.from_pretrained(pretrain_path, checkpoint_file=checkpoint_name)
+        self.in_roberta.train()
+        self.sp_roberta.train()
 
         self.max_length = max_length
         # self.tokenizer = 直接只用in_roberta内置的方法 具体查看fairseq 的接口
@@ -195,7 +192,7 @@ class RobertaSentenceEncoder(nn.Module):
         return in_x
 
     def _sp_encoder(self,inputs):
-        sp_x = self.sp_roberta.extract_features(inputs['word'])[:, 1, :]
+        sp_x = self.sp_roberta.extract_features(inputs['word'])[:, 1, :]#@jinhui 因为这个的缘故吗？ 重要的差异
         return  sp_x
 
 
@@ -236,18 +233,24 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
             nn.Linear(hidden_size, hidden_size * 2),
             nn.LeakyReLU(inplace=True),
             nn.Linear(hidden_size * 2, hidden_size))
-        self.g1_drop = nn.Dropout()
+        # self.g1_drop = nn.Dropout()
+
+        # self.in_featuretransfer = nn.Sequential(
+        #     nn.Linear(hidden_size, hidden_size * 2),
+        #     nn.LeakyReLU(),
+        #     nn.Linear(hidden_size * 2, hidden_size))
 
 
 
     def forward(self, inputs):
         in_x = self._in_encoder(inputs)#B, S_N ,D
-        sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
+        sp_x = self._sp_encoder(inputs)
 
         return in_x, sp_x
 
     def _in_encoder(self, inputs):
         in_x = self.in_roberta.extract_features(inputs['word'])[:,1,:]  # B, S_N ,D
+
         return in_x
     def _sp_encoder(self,inputs):
         sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))

@@ -1,0 +1,119 @@
+2021-04-21 15:38:10,291 INFO    : log id: 20210421_153810
+2021-04-21 15:38:10,292 INFO    : 2-way-5-shot Few-Shot Relation Classification
+2021-04-21 15:38:10,292 INFO    : model: DAProtoNet
+2021-04-21 15:38:10,292 INFO    : encoder: roberta
+2021-04-21 15:38:10,292 INFO    : max_length: 200
+2021-04-21 15:39:02,591 INFO    : Start training...
+2021-04-21 15:39:02,592 INFO    : Use bert optim!
+2021-04-21 15:58:43,954 INFO    : step: 1000 | loss: 7.035665, accuracy_: 72.93%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 15:58:43,957 INFO    : Use val dataset
+2021-04-21 16:04:17,591 INFO    : [EVAL] step: 1000 | accuracy: 74.80%
+2021-04-21 16:04:17,593 INFO    : Best checkpoint
+2021-04-21 16:04:22,614 INFO    : 
+
+2021-04-21 16:23:48,094 INFO    : step: 2000 | loss: 4.219190, accuracy_: 79.72%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 16:23:48,096 INFO    : Use val dataset
+2021-04-21 16:29:30,201 INFO    : [EVAL] step: 1000 | accuracy: 75.20%
+2021-04-21 16:29:30,203 INFO    : Best checkpoint
+2021-04-21 16:29:35,937 INFO    : 
+
+2021-04-21 16:48:10,912 INFO    : step: 3000 | loss: 2.519092, accuracy_: 77.02%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 16:48:10,914 INFO    : Use val dataset
+2021-04-21 16:54:08,688 INFO    : [EVAL] step: 1000 | accuracy: 78.80%
+2021-04-21 16:54:08,690 INFO    : Best checkpoint
+2021-04-21 16:54:14,149 INFO    : 
+
+2021-04-21 17:12:43,321 INFO    : step: 4000 | loss: 1.263907, accuracy_: 82.22%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 17:12:43,324 INFO    : Use val dataset
+2021-04-21 17:18:41,304 INFO    : [EVAL] step: 1000 | accuracy: 80.00%
+2021-04-21 17:18:41,306 INFO    : Best checkpoint
+2021-04-21 17:18:45,956 INFO    : 
+
+2021-04-21 17:37:18,283 INFO    : step: 5000 | loss: 0.755689, accuracy_: 86.51%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 17:37:18,285 INFO    : Use val dataset
+2021-04-21 17:43:11,671 INFO    : [EVAL] step: 1000 | accuracy: 81.60%
+2021-04-21 17:43:11,673 INFO    : Best checkpoint
+2021-04-21 17:43:16,494 INFO    : 
+
+2021-04-21 18:01:44,572 INFO    : step: 6000 | loss: 1.439066, accuracy_: 81.37%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 18:01:44,574 INFO    : Use val dataset
+2021-04-21 18:07:41,318 INFO    : [EVAL] step: 1000 | accuracy: 80.40%
+2021-04-21 18:07:41,320 INFO    : 
+
+2021-04-21 18:26:09,093 INFO    : step: 7000 | loss: 0.857937, accuracy_: 88.06%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 18:26:09,095 INFO    : Use val dataset
+2021-04-21 18:32:05,154 INFO    : [EVAL] step: 1000 | accuracy: 75.20%
+2021-04-21 18:32:05,156 INFO    : 
+
+2021-04-21 18:50:40,900 INFO    : step: 8000 | loss: 1.812492, accuracy_: 76.12%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 18:50:40,902 INFO    : Use val dataset
+2021-04-21 18:56:34,307 INFO    : [EVAL] step: 1000 | accuracy: 74.80%
+2021-04-21 18:56:34,309 INFO    : 
+
+2021-04-21 19:15:04,826 INFO    : step: 9000 | loss: 1.749895, accuracy_: 50.65%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 19:15:04,829 INFO    : Use val dataset
+2021-04-21 19:20:57,457 INFO    : [EVAL] step: 1000 | accuracy: 73.60%
+2021-04-21 19:20:57,459 INFO    : 
+
+2021-04-21 19:39:23,719 INFO    : step: 10000 | loss: 1.417313, accuracy_: 50.90%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 19:39:23,721 INFO    : Use val dataset
+2021-04-21 19:45:15,156 INFO    : [EVAL] step: 1000 | accuracy: 74.00%
+2021-04-21 19:45:15,158 INFO    : 
+
+2021-04-21 20:03:46,379 INFO    : step: 11000 | loss: 1.342156, accuracy_: 50.70%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 20:03:46,383 INFO    : Use val dataset
+2021-04-21 20:09:40,521 INFO    : [EVAL] step: 1000 | accuracy: 66.80%
+2021-04-21 20:09:40,523 INFO    : 
+
+2021-04-21 20:28:08,738 INFO    : step: 12000 | loss: 1.364004, accuracy_: 50.05%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 20:28:08,740 INFO    : Use val dataset
+2021-04-21 20:34:00,161 INFO    : [EVAL] step: 1000 | accuracy: 73.20%
+2021-04-21 20:34:00,163 INFO    : 
+
+2021-04-21 20:52:27,449 INFO    : step: 13000 | loss: 1.228130, accuracy_: 49.30%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 20:52:27,452 INFO    : Use val dataset
+2021-04-21 20:58:21,724 INFO    : [EVAL] step: 1000 | accuracy: 75.20%
+2021-04-21 20:58:21,726 INFO    : 
+
+2021-04-21 21:16:48,525 INFO    : step: 14000 | loss: 1.181677, accuracy_: 49.30%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 21:16:48,528 INFO    : Use val dataset
+2021-04-21 21:22:42,191 INFO    : [EVAL] step: 1000 | accuracy: 69.60%
+2021-04-21 21:22:42,195 INFO    : 
+
+2021-04-21 21:41:10,572 INFO    : step: 15000 | loss: 1.175789, accuracy_: 47.65%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 21:41:10,575 INFO    : Use val dataset
+2021-04-21 21:47:03,534 INFO    : [EVAL] step: 1000 | accuracy: 74.00%
+2021-04-21 21:47:03,536 INFO    : 
+
+2021-04-21 22:05:34,593 INFO    : step: 16000 | loss: 1.073058, accuracy_: 51.95%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 22:05:34,596 INFO    : Use val dataset
+2021-04-21 22:11:25,891 INFO    : [EVAL] step: 1000 | accuracy: 67.60%
+2021-04-21 22:11:25,893 INFO    : 
+
+2021-04-21 22:29:52,123 INFO    : step: 17000 | loss: 1.065155, accuracy_: 50.05%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 22:29:52,125 INFO    : Use val dataset
+2021-04-21 22:35:42,632 INFO    : [EVAL] step: 1000 | accuracy: 68.40%
+2021-04-21 22:35:42,634 INFO    : 
+
+2021-04-21 22:54:13,911 INFO    : step: 18000 | loss: 1.043397, accuracy_: 48.95%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 22:54:13,914 INFO    : Use val dataset
+2021-04-21 23:00:06,977 INFO    : [EVAL] step: 1000 | accuracy: 61.60%
+2021-04-21 23:00:06,979 INFO    : 
+
+2021-04-21 23:18:39,480 INFO    : step: 19000 | loss: 0.988614, accuracy_: 51.50%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 23:18:39,483 INFO    : Use val dataset
+2021-04-21 23:24:33,529 INFO    : [EVAL] step: 1000 | accuracy: 64.40%
+2021-04-21 23:24:33,531 INFO    : 
+
+2021-04-21 23:42:52,092 INFO    : step: 20000 | loss: 0.999487, accuracy_: 47.65%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 23:42:52,095 INFO    : Use val dataset
+2021-04-21 23:48:37,781 INFO    : [EVAL] step: 1000 | accuracy: 66.80%
+2021-04-21 23:48:37,783 INFO    : 
+
+2021-04-21 23:48:37,783 INFO    : 
+####################
+
+2021-04-21 23:48:37,784 INFO    : Finish training DAProtoNet-roberta-electronics_reviews-kitchen_reviews-2-5
+2021-04-21 23:48:37,790 INFO    : Use test dataset
+2021-04-22 00:40:46,571 INFO    : [EVAL] step: 10000 | accuracy: 81.72%
+2021-04-22 00:40:46,574 INFO    : RESULT: 81.72

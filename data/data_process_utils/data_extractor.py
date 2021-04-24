@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*
-import sys, io
+import sys, io, os
 from os.path import normpath,join,dirname
 
 # print("---"*15)
 # print(__file__)
 # print(normpath(join(dirname(__file__), '../..')), flush=True)# 指向的是你文件运行的路径，如果在命令行跑那么它是根据你启动的路径来确认的
-sys.path.append(normpath(join(dirname(__file__), '../..')))
+sys.path.append(normpath(join(os.path.dirname(os.path.abspath(__file__), '../..'))))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 # 命令行中带的坑： 要加个PYTHONPATH=. 指向python工程的根目录，就可以省去很多麻烦（这是pycharm帮我们集成了的）
 # 运行的环境路径和工程链接路径的差异性   #核心冲突，命令行认为的项目根目录和实际的项目根目录
@@ -175,7 +175,7 @@ def getReviewJsons(rawReviews):
         tripleSelectet = 1
         try:
             concepts, opinionConceptTriples = getReviewConceptsAndTriples(review, nlp, tripleSelectet)
-        except:
+        except KeyboardInterrupt:
             print("一篇使得nlp(reviews)报错的文章--" + str(index) + "--\t--" + review)
             continue
         reviewJson = {"tokens": tokens,

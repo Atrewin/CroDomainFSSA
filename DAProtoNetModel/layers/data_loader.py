@@ -66,7 +66,7 @@ def getDatesetFilePath(root, name):
         name = "books/" + name
     elif "dvd" in name:
         name = "dvd/" + name
-    elif "ele" in name:
+    elif "electr" in name:
         name = "electronics/" + name
     elif "kitchen" in name:
         name  = "kitchenAndhousewares/" + name

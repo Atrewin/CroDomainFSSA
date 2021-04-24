@@ -1,0 +1,15 @@
+2021-04-20 09:10:21,462 INFO    : 2-way-2-shot Few-Shot Relation Classification
+2021-04-20 09:10:21,462 INFO    : model: DAProtoNet
+2021-04-20 09:10:21,462 INFO    : encoder: roberta_A
+2021-04-20 09:10:21,462 INFO    : max_length: 200
+2021-04-20 09:11:00,137 INFO    : Start training...
+2021-04-20 09:11:00,137 INFO    : Use bert optim!
+2021-04-20 09:12:28,577 INFO    : step:  500 | loss: 0.371763, accuracy: 83.43%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-20 09:12:28,579 INFO    : Use val dataset
+2021-04-20 09:12:54,422 INFO    : [EVAL] step: 1000 | accuracy: 60.80%
+2021-04-20 09:12:54,423 INFO    : 
+2021-04-20 09:12:54,424 INFO    : Best checkpoint
+2021-04-20 09:14:24,844 INFO    : step: 1000 | loss: 0.348434, accuracy: 87.72%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-20 09:14:24,846 INFO    : Use val dataset
+2021-04-20 09:14:51,584 INFO    : [EVAL] step: 1000 | accuracy: 52.00%
+2021-04-20 09:14:51,584 INFO    : 

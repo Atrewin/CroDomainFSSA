@@ -8,16 +8,17 @@ TOKENS_PER_SAMPLE=512   # Max sequence length
 MAX_POSITIONS=512       # Num. positional embeddings (usually same as above)
 MAX_SENTENCES=8        # Number of sequences per batch (batch size)
 UPDATE_FREQ=8          # Increase the batch size 8x total bsz = 8*8
-MAX_EPOCH=160           # update epochs
-SAVE_INTERVAL=50
+MAX_EPOCH=600           # update epochs
+SAVE_INTERVAL=100
 # 三个会随着domain_A --> domain_B 变化的参数
-domains=electronics2kitchen
+domains=dvd2kitchen
 
 DATA_DIR=data/domain_data/data-bin/${domains}/mask
-ROBERTA_PATH=/home/cike/project/fairseq/extension/RoBERT/pre-train/checkpoints/roberta.base/model.pt #取到上一个训练的模式
+# /home/cike/project/fairseq/extension/RoBERT/pre-train/roberta.base/model.pt
+ROBERTA_PATH=/home/cike/project/fairseq/extension/RoBERT/pre-train/roberta.base/model.pt #取到上一个训练的模式
 SAVE_PATH=checkpoints/MASK_${domains}                       # 不知道为什么，无法设置 @jinhui 0315 因为做了代换为 --save-dir 而不是看到的--save_dir
 
-CUDA_VISIBLE_DEVICES=2 fairseq-train --fp16 $DATA_DIR \
+CUDA_VISIBLE_DEVICES=3 fairseq-train --fp16 $DATA_DIR \
     --restore-file $ROBERTA_PATH \
     --save-dir $SAVE_PATH \
     --save-interval $SAVE_INTERVAL \
@@ -29,8 +30,9 @@ CUDA_VISIBLE_DEVICES=2 fairseq-train --fp16 $DATA_DIR \
     --batch-size $MAX_SENTENCES --update-freq $UPDATE_FREQ \
     --max-update $TOTAL_UPDATES --log-format simple --log-interval 1 \
     --skip-invalid-size-inputs-valid-test \
+    --max-epoch $MAX_EPOCH \
     --reset-optimizer --reset-dataloader --reset-meters \
-    --max-epoch $MAX_EPOCH
+
 # 问题记录
 # 它会过掉restore中对于的参数，估计是load_model(dict)中是按键值赋值的
 # "(0.9, 0.98)" 是传不进去的， 我在源代码做了(0.9, 0.98)的规定（规定赋值）

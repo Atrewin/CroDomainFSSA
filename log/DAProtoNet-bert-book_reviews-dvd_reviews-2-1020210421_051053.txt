@@ -1,0 +1,34 @@
+2021-04-21 05:10:53,373 INFO    : 2-way-10-shot Few-Shot Relation Classification
+2021-04-21 05:10:53,374 INFO    : model: DAProtoNet
+2021-04-21 05:10:53,374 INFO    : encoder: bert
+2021-04-21 05:10:53,374 INFO    : max_length: 200
+2021-04-21 05:10:53,374 INFO    : start_train_prototypical: -1
+2021-04-21 05:10:53,374 INFO    : start_train_adv: 30000
+2021-04-21 05:10:53,374 INFO    : start_train_dis: -1
+2021-04-21 05:10:53,374 INFO    : pretrain_ckpt: None
+2021-04-21 05:11:58,851 INFO    : Start training...
+2021-04-21 05:11:58,852 INFO    : Use bert optim!
+2021-04-21 05:29:13,881 INFO    : step: 1000 | loss: 0.985040, accuracy_: 59.99%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 05:29:13,887 INFO    : Use val dataset
+2021-04-21 05:32:41,674 INFO    : [EVAL] step: 1000 | accuracy: 74.20%
+2021-04-21 05:32:41,676 INFO    : Best checkpoint
+2021-04-21 05:32:44,999 INFO    : 
+
+2021-04-21 05:49:19,344 INFO    : step: 2000 | loss: 0.332342, accuracy_: 87.44%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 05:49:19,349 INFO    : Use val dataset
+2021-04-21 05:52:47,292 INFO    : [EVAL] step: 1000 | accuracy: 76.40%
+2021-04-21 05:52:47,295 INFO    : Best checkpoint
+2021-04-21 05:52:50,904 INFO    : 
+
+2021-04-21 06:09:20,482 INFO    : step: 3000 | loss: 0.163468, accuracy_: 95.35%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 06:09:20,486 INFO    : Use val dataset
+2021-04-21 06:12:48,356 INFO    : [EVAL] step: 1000 | accuracy: 81.80%
+2021-04-21 06:12:48,359 INFO    : Best checkpoint
+2021-04-21 06:13:00,964 INFO    : 
+
+2021-04-21 06:29:04,684 INFO    : step: 4000 | loss: 0.193182, accuracy_: 94.28%, dis_loss: 0.000000, dis_acc: 0.000000, sen_in_acc: 0.000000, sen_sp_acc: 0.000000
+2021-04-21 06:29:04,688 INFO    : Use val dataset
+2021-04-21 06:32:32,312 INFO    : [EVAL] step: 1000 | accuracy: 82.60%
+2021-04-21 06:32:32,315 INFO    : Best checkpoint
+2021-04-21 06:32:37,152 INFO    : 
+

@@ -1,0 +1,29 @@
+2021-04-20 06:58:51,698 INFO    : 2-way-2-shot Few-Shot Relation Classification
+2021-04-20 06:58:51,698 INFO    : model: DAProtoNet
+2021-04-20 06:58:51,699 INFO    : encoder: roberta_A
+2021-04-20 06:58:51,699 INFO    : max_length: 200
+2021-04-20 06:59:31,194 INFO    : Start training...
+2021-04-20 06:59:31,195 INFO    : Use bert optim!
+2021-04-20 07:00:55,157 INFO    : step:  500 | loss: 0.427302, accuracy: 81.14%
+2021-04-20 07:00:55,158 INFO    : Use val dataset
+2021-04-20 07:01:21,291 INFO    : [EVAL] step: 1000 | accuracy: 53.60%
+2021-04-20 07:01:21,292 INFO    : Best checkpoint
+2021-04-20 07:02:54,889 INFO    : step: 1000 | loss: 0.434257, accuracy: 81.99%
+2021-04-20 07:02:54,892 INFO    : Use val dataset
+2021-04-20 07:03:20,468 INFO    : [EVAL] step: 1000 | accuracy: 56.00%
+2021-04-20 07:03:20,469 INFO    : Best checkpoint
+2021-04-20 07:04:47,533 INFO    : step: 1500 | loss: 0.529836, accuracy: 72.95%
+2021-04-20 07:04:47,536 INFO    : Use val dataset
+2021-04-20 07:05:13,108 INFO    : [EVAL] step: 1000 | accuracy: 61.40%
+2021-04-20 07:05:13,109 INFO    : Best checkpoint
+2021-04-20 07:06:42,635 INFO    : step: 2000 | loss: 0.405656, accuracy: 84.68%
+2021-04-20 07:06:42,638 INFO    : Use val dataset
+2021-04-20 07:07:09,512 INFO    : [EVAL] step: 1000 | accuracy: 61.60%
+2021-04-20 07:07:09,514 INFO    : Best checkpoint
+2021-04-20 07:08:37,351 INFO    : step: 2500 | loss: 0.398377, accuracy: 84.28%
+2021-04-20 07:08:37,352 INFO    : Use val dataset
+2021-04-20 07:09:02,657 INFO    : [EVAL] step: 1000 | accuracy: 65.20%
+2021-04-20 07:09:02,658 INFO    : Best checkpoint
+2021-04-20 07:10:32,734 INFO    : step: 3000 | loss: 0.435380, accuracy: 83.93%
+2021-04-20 07:10:32,735 INFO    : Use val dataset
+2021-04-20 07:10:58,571 INFO    : [EVAL] step: 1000 | accuracy: 60.20%

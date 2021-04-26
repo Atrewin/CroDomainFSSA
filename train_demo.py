@@ -184,7 +184,7 @@ def main():
             if ckpt is None:
                 logger.info("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
                 ckpt = 'none'
-    except :# 提前中断，执行最终测试
+    except RuntimeError:# 提前中断，执行最终测试
 
         logger.info(traceback.print_exc())
         acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)

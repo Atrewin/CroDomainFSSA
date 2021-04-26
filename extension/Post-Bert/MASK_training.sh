@@ -8,10 +8,10 @@ TOKENS_PER_SAMPLE=512   # Max sequence length
 MAX_POSITIONS=512       # Num. positional embeddings (usually same as above)
 MAX_SENTENCES=8        # Number of sequences per batch (batch size)
 UPDATE_FREQ=8          # Increase the batch size 8x total bsz = 8*8
-MAX_EPOCH=600           # update epochs
-SAVE_INTERVAL=100
+MAX_EPOCH=500           # update epochs
+SAVE_INTERVAL=50
 # 三个会随着domain_A --> domain_B 变化的参数
-domains=dvd2kitchen
+domains=book2dvd
 
 DATA_DIR=data/domain_data/data-bin/${domains}/mask
 # /home/cike/project/fairseq/extension/RoBERT/pre-train/roberta.base/model.pt

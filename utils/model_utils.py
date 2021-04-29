@@ -33,6 +33,11 @@ def getSentenceEncoder(encoder_name, opt):
         filepath, tempfilename = os.path.split(pretrain_ckpt)
         sentence_encoder = RobertaNewgraphSentenceEncoder(filepath,tempfilename, max_length, hidden_size=opt.hidden_size, cat_entity_rep=opt.cat_entity_rep)
 
+    elif encoder_name == "bert_newGraph":
+        pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
+        max_length = opt.max_length
+        sentence_encoder = BertGraphSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep,
+                                               mask_entity=opt.mask_entity)
 
     else:
         raise NotImplementedError

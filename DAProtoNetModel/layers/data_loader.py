@@ -109,7 +109,7 @@ class FewGraphDataset(data.Dataset):
             if class_name == "pos":
                 graphFeature = self.graph_feature[j]
             else:
-                graphFeature = self.graphFeature[j + 1000]
+                graphFeature = self.graph_feature[j + 1000]
         graphFeature = torch.tensor(graphFeature).type(torch.FloatTensor)
         return graphFeature
 
@@ -199,8 +199,8 @@ def collate_fn(data):
 
 
 def get_loader(name, encoder, N, K, Q, batch_size, 
-        num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data/domain_data/processed_data'):
-    dataset = FewGraphDataset(name, encoder, N, K, Q, na_rate, root)#已经ID化 @jinhui 改变了FewRelDataset
+        num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data/domain_data/processed_data', opt=None):
+    dataset = FewGraphDataset(name, encoder, N, K, Q, na_rate, root, isNewGraphFeature=opt.isNewGraphFeature)#已经ID化 @jinhui 改变了FewRelDataset
     temp = dataset[0]# 参看数据format
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,

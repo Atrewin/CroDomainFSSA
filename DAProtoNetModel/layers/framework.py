@@ -275,13 +275,19 @@ class FewShotREFramework:
                     # logger.info('\n')
                     pass
                 # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
-                if opt.encoder == "roberta_newGraph":
-                    logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
+                if opt.encoder in ["roberta_newGraph","bert_newGraph"]:
 
-                    loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.05 #可能影响太大了
+                    if opt.ignore_graph_feature:
+                        logits, pred = model.forwardWithIgnoreGraph(support, query, N_for_train, K,
+                                             Q * N_for_train + na_rate * Q)
+                        loss = model.loss(logits, label) / float(grad_iter)
+                        pass
+                    else:
+                        logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
 
-                    loss = model.loss(logits, label)
-                    loss = (loss+ loss_recon) / float(grad_iter)
+                        loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.05 #可能影响太大了
+                        loss = model.loss(logits, label)
+                        loss = (loss+ loss_recon) / float(grad_iter)
                 else:
                     logits, pred= model(support, query, N_for_train, K,
                                                                             Q * N_for_train + na_rate * Q)

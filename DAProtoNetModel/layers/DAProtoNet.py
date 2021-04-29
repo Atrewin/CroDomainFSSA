@@ -156,4 +156,30 @@ class DAProtoNet(framework.FewShotREModel):
 
         return logits, pred, reconGraphFeature
 
+    def forwardWithoutGraphFeature(self, support, query, N, K, total_Q):
+
+        in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
+        in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
+        hidden_size = in_support_emb.size(-1)
+
+        support_emb = in_support_emb
+        query_emb = in_query_emb
+
+        support = self.drop(support_emb)
+        query = self.drop(query_emb)
+        support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+        query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+        # Prototypical Networks
+        # Ignore NA policy
+        support = torch.mean(support, 2)  # Calculate prototype for each class
+        logits = self.__batch_dist__(support, query)  # (B, total_Q, N)
+        minn, _ = logits.min(-1)
+        logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+        _, pred = torch.max(logits.view(-1, N + 1), 1)  # N + 1会有问题吗？
+
+
+
+        return logits, pred
+
 

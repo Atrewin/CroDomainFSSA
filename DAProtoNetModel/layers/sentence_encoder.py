@@ -276,6 +276,66 @@ class RobertaNewgraphSentenceEncoder(nn.Module):
         return inputs["graphFeature"]
 
 
+
+class BertGraphSentenceEncoder(nn.Module):
+    def __init__(self, pretrain_path, max_length, graphFeature_size=100, hidden_size=768, cat_entity_rep=False, mask_entity=False):
+        nn.Module.__init__(self)
+        # 也可以考虑直接取Bert CSL 和SLP的方案
+        self.in_bert = BertModel.from_pretrained(pretrain_path)
+        self.max_length = max_length
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.cat_entity_rep = cat_entity_rep
+        self.mask_entity = mask_entity
+
+
+        self.in_encoder = self._in_encoder
+        self.sp_encoder = self._sp_encoder
+        # TODO jinhui
+        # graph feature map
+        # encoder
+        self.graphFeaturetransfer = nn.Sequential(
+            nn.Linear(graphFeature_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size * 2),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(hidden_size * 2, hidden_size))
+
+
+
+    def forward(self, inputs):
+        in_x = self._in_encoder(inputs)#B, S_N ,D
+        sp_x = self._sp_encoder(inputs)
+
+        return in_x, sp_x
+
+    def _in_encoder(self, inputs):
+        _, in_x = self.in_bert(inputs['word'])# @jinhui 0429 疑问为什么不用提供Mask等？
+        return in_x
+
+    def _sp_encoder(self,inputs):
+        sp_x = self.graphFeaturetransfer(self.getGraphFeature(inputs))
+        return sp_x
+
+    def tokenize(self, raw_tokens):
+        # token -> index
+        tokens = ['[CLS]']
+        for token in raw_tokens:
+            token = token.lower()
+            tokens += self.tokenizer.tokenize(token)
+        indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokens)
+
+        # padding
+        while len(indexed_tokens) < self.max_length:
+            indexed_tokens.append(0)
+        indexed_tokens = indexed_tokens[:self.max_length]
+
+        return indexed_tokens
+
+
+    def getGraphFeature(self, inputs):
+        # 直接返回的方案
+        return inputs["graphFeature"]
+
+
 class RobertaNewgraphSentenceEncoder_old(nn.Module):
     def __init__(self, pretrain_path,checkpoint_name, max_length, graphFeature_size=100, hidden_size=768, cat_entity_rep=False):
         nn.Module.__init__(self)

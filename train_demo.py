@@ -66,6 +66,9 @@ def main():
     parser.add_argument('--start_train_prototypical', default=-1 , type=int, help='iter to start train prototypical')
     parser.add_argument('--start_train_adv', default=500, type=int, help="iter to start add adv")
     parser.add_argument('--start_train_dis', default=-1, type=int, help='iter to start train discriminator.')
+    parser.add_argument('--is_old_graph_feature', default=0, type=int, help='1 if old graph feature ')
+    parser.add_argument('--ignore_graph_feature', default=0, type=int, help='1 if ignore graph feature ')
+
 
     # log模块设计
     parser.add_argument('--log_root', type=str, default='log/', help='Root directory for all logging.')
@@ -80,6 +83,7 @@ def main():
     model_name = "DAProtoNet"
     encoder_name = opt.encoder
     max_length = opt.max_length
+    opt.isNewGraphFeature = not opt.is_old_graph_feature
 
     # train_log setting
     LOG_PATH = opt.log_root
@@ -103,12 +107,13 @@ def main():
     logger.info("Q: {}".format(opt.Q))
     logger.info("train: {}".format(opt.train))
     logger.info("val: {}".format(opt.val))
-    logger.info("val: {}".format(opt.test))
+    logger.info("test: {}".format(opt.test))
 
     logger.info("start_train_prototypical: {}".format(opt.start_train_prototypical))
     logger.info("start_train_adv: {}".format(opt.start_train_adv))
     logger.info("start_train_dis: {}".format(opt.start_train_dis))
-
+    logger.info("is_old_graph_feature: {}".format(opt.is_old_graph_feature))
+    logger.info("ignore_graph_feature: {}".format(opt.ignore_graph_feature))
     logger.info("#" * 30)
 
     #  构造模型   @jinhui 将整个模型框架传入的设计会更加优雅
@@ -117,9 +122,9 @@ def main():
     sentence_encoder = getSentenceEncoder(encoder_name, opt)
     model = DAProtoNet(sentence_encoder, opt.hidden_size, dot=opt.dot)
 
-    train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-    val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-    test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
+    train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
+    val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
+    test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     if opt.adv:
         adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
 
@@ -138,8 +143,14 @@ def main():
     sen_D = Sen_Discriminator(opt.hidden_size)# 是这里开始变慢了？
     sen_sp_D = Sen_Discriminator_sp(opt.hidden_size)
     framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader, adv_data_loader=adv_data_loader, adv=opt.adv, d=d, sen_d=sen_D, sen_sp_D=sen_sp_D)
-        
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
+
+
+    if opt.is_old_graph_feature:
+        prefix += '-oldGraphFeature'
+
+    if opt.ignore_graph_feature:
+        prefix += "-ignore_graph_feature"
 
     if opt.na_rate != 0:
         prefix += '-na{}'.format(opt.na_rate)
@@ -163,7 +174,7 @@ def main():
     try:
 
         if not opt.only_test:
-            if encoder_name in ['bert', 'roberta', "roberta_newGraph"]:
+            if encoder_name in ['bert', 'roberta', "roberta_newGraph","bert_newGraph"]:
                 bert_optim = True
             else:
                 bert_optim = False

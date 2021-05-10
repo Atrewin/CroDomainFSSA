@@ -64,10 +64,12 @@ def main():
 
     # 切分时间设计
     parser.add_argument('--start_train_prototypical', default=-1 , type=int, help='iter to start train prototypical')
-    parser.add_argument('--start_train_adv', default=500, type=int, help="iter to start add adv")
+    parser.add_argument('--start_train_adv', default=500000, type=int, help="iter to start add adv")
     parser.add_argument('--start_train_dis', default=-1, type=int, help='iter to start train discriminator.')
     parser.add_argument('--is_old_graph_feature', default=0, type=int, help='1 if old graph feature ')
     parser.add_argument('--ignore_graph_feature', default=0, type=int, help='1 if ignore graph feature ')
+    parser.add_argument('--ignore_bert_feature', default=0, type=int, help='1 if ignore bert feature ')
+
 
 
     # log模块设计
@@ -90,6 +92,25 @@ def main():
     if not os.path.exists(LOG_PATH):
         os.makedirs(LOG_PATH)
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
+
+    if not opt.isNewGraphFeature:
+        prefix += '-oldGraphFeature'
+
+    if opt.ignore_graph_feature:
+        prefix += "-ignore_graph_feature"
+
+    if opt.ignore_bert_feature:
+        prefix += "-ignore_bert_feature"
+
+
+    if opt.na_rate != 0:
+        prefix += '-na{}'.format(opt.na_rate)
+    if opt.dot:
+        prefix += '-dot'
+    if opt.cat_entity_rep:
+        prefix += '-catentity'
+    if len(opt.ckpt_name) > 0:
+        prefix += '-' + opt.ckpt_name
 
     nowTime = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_path = os.path.join(LOG_PATH, prefix + "-" + opt.notes + "-" + nowTime + ".txt")
@@ -114,6 +135,9 @@ def main():
     logger.info("start_train_dis: {}".format(opt.start_train_dis))
     logger.info("is_old_graph_feature: {}".format(opt.is_old_graph_feature))
     logger.info("ignore_graph_feature: {}".format(opt.ignore_graph_feature))
+    logger.info("ignore_bert_feature: {}".format(opt.ignore_bert_feature))
+    logger.info("learn rate: {}".format(opt.lr))
+    logger.info("notes: {}".format(opt.notes))
     logger.info("#" * 30)
 
     #  构造模型   @jinhui 将整个模型框架传入的设计会更加优雅
@@ -121,13 +145,14 @@ def main():
 
     sentence_encoder = getSentenceEncoder(encoder_name, opt)
     model = DAProtoNet(sentence_encoder, opt.hidden_size, dot=opt.dot)
-
+    # 这里貌似有异步调用的问题
     train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     if opt.adv:
         adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-
+    else:
+        adv_data_loader = None
     if opt.optim == 'sgd':
         pytorch_optim = optim.SGD
     elif opt.optim == 'adam':
@@ -143,23 +168,7 @@ def main():
     sen_D = Sen_Discriminator(opt.hidden_size)# 是这里开始变慢了？
     sen_sp_D = Sen_Discriminator_sp(opt.hidden_size)
     framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader, adv_data_loader=adv_data_loader, adv=opt.adv, d=d, sen_d=sen_D, sen_sp_D=sen_sp_D)
-    prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
 
-
-    if opt.is_old_graph_feature:
-        prefix += '-oldGraphFeature'
-
-    if opt.ignore_graph_feature:
-        prefix += "-ignore_graph_feature"
-
-    if opt.na_rate != 0:
-        prefix += '-na{}'.format(opt.na_rate)
-    if opt.dot:
-        prefix += '-dot'
-    if opt.cat_entity_rep:
-        prefix += '-catentity'
-    if len(opt.ckpt_name) > 0:
-        prefix += '-' + opt.ckpt_name
 
 
 
@@ -198,10 +207,10 @@ def main():
     except RuntimeError:# 提前中断，执行最终测试
 
         logger.info(traceback.print_exc())
-        acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)
+        acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, opt=opt)
         logger.info("RESULT: %.2f" % (acc * 100))
 
-    acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt)
+    acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, opt=opt)
     logger.info("RESULT: %.2f" % (acc * 100))
 
 if __name__ == "__main__":

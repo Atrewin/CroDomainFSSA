@@ -52,6 +52,7 @@ class FewShotREModel(nn.Module):
         '''
         N = logits.size(-1)
         return self.cost(logits.view(-1, N), label.view(-1))
+        # return self.cost(F.softmax(logits.view(-1, N),dim=1), label.view(-1))#jinhui 改0507
 
     def accuracy(self, pred, label):
         '''
@@ -59,7 +60,7 @@ class FewShotREModel(nn.Module):
         label: Label with whatever size
         return: [Accuracy] (A single value)
         '''
-        return torch.mean((pred.view(-1) == label.view(-1)).type(torch.FloatTensor))
+        return torch.mean((pred.view(-1) == label.view(-1)).type(torch.FloatTensor))#0.2500,
 
 
 class FewShotREFramework:
@@ -258,43 +259,49 @@ class FewShotREFramework:
         for it in range(start_iter, start_iter + train_iter):
 
             support, query, label, support_label = next(self.train_data_loader)
-            if torch.cuda.is_available():  # @jinhui 疑惑 为什么要分开to cuda
+            if torch.cuda.is_available():  # @jinhui 疑惑 为什么要分开to cuda 'dict' object has no attribute 'cuda'
+                label = label.cuda()
+                support_label = support_label.cuda()
                 for k in support:
-                    support[k] = support[k].cuda()
+                    support[k] = support[k].cuda()# 这里直接cuda()会有问题？
                 for k in query:
                     query[k] = query[k].cuda()
 
-                label = label.cuda()
-                support_label = support_label.cuda()
+                # support = support.cuda()
+                # query = query.cuda()
             # 重构graphFeature
             support_graphFeature, query_graphFeature = support["graphFeature"], query["graphFeature"]
             graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
 
             if it > opt.start_train_prototypical:
-                if it == opt.start_train_prototypical + 1:
-                    # logger.info('\n')
-                    pass
+                optimizer.zero_grad()#防止eval()的时候发生波动
                 # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
-                if opt.encoder in ["roberta_newGraph","bert_newGraph"]:
+                if opt.encoder in ["roberta_newGraph","bert_newGraph", "graph"]:
 
                     if opt.ignore_graph_feature:
                         logits, pred = model.forwardWithIgnoreGraph(support, query, N_for_train, K,
                                              Q * N_for_train + na_rate * Q)
                         loss = model.loss(logits, label) / float(grad_iter)
                         pass
+                    elif opt.ignore_bert_feature:# 为了减少内存的使用，特意重写了一个sentence encoder（graph）
+                        logits, pred, graphFeatureRcon = model.forwardWithIgnoreBert(support, query, N_for_train, K,
+                                                                    Q * N_for_train + na_rate * Q)
+                        loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.05  # 可能影响太大了
+                        loss = model.loss(logits, label)
+                        loss = (loss + loss_recon) / float(grad_iter)
                     else:
                         logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N_for_train, K, Q * N_for_train + na_rate * Q)
 
                         loss_recon = model.loss_recon(graphFeatureRcon, graphFeature) * 0.05 #可能影响太大了
                         loss = model.loss(logits, label)
-                        loss = (loss+ loss_recon) / float(grad_iter)
+                        loss = (loss + loss_recon) / float(grad_iter)
                 else:
                     logits, pred= model(support, query, N_for_train, K,
                                                                             Q * N_for_train + na_rate * Q)
                     loss = model.loss(logits, label) / float(grad_iter)
 
                 right = model.accuracy(pred, label)
-
+                # loss = loss*6#@jinhui 统一调整学习率的做法
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
@@ -309,7 +316,7 @@ class FewShotREFramework:
                     optimizer.step()
                     scheduler.step()
                     optimizer.zero_grad()
-                    torch.cuda.empty_cache()
+                    # torch.cuda.empty_cache()
 
                 iter_loss += self.item(loss.data)
                 iter_right += self.item(right.data)
@@ -390,7 +397,7 @@ class FewShotREFramework:
                     optimizer_sen_dis.zero_grad()
                     optimizer_sen_dis_sp.zero_grad()
                     # optimizer_encoder.zero_grad()# s是否想要双优化器想要讨论
-                    torch.cuda.empty_cache()
+                    # torch.cuda.empty_cache()
 
 
 
@@ -447,7 +454,7 @@ class FewShotREFramework:
                                                                                    100 * iter_right / iter_proto) + '\r')
 
                 acc = self.eval(model, B, N_for_eval, K, Q, val_iter,
-                                na_rate=na_rate)
+                                na_rate=na_rate, opt=opt)
                 model.train()
                 if acc > best_acc:
                     logger.info('Best checkpoint')
@@ -466,12 +473,13 @@ class FewShotREFramework:
         logger.info("\n####################\n")
         logger.info("Finish training " + model_name)
 
+
     def eval(self,
              model,
              B, N, K, Q,
              eval_iter,
              na_rate=0,
-             ckpt=None):
+             ckpt=None, opt=None):
         '''
         model: a FewShotREModel instance
         B: Batch size
@@ -483,7 +491,7 @@ class FewShotREFramework:
         return: Accuracy
         '''
         # print("")
-        model.eval()
+        model.eval()#@jinhui 难道这里model.eval() ：不启用 BatchNormalization 和 Dropout 但是如果使用的是self.training = mode 估计只是作用到了model.forward()函数上了
         if ckpt is None:
             logger.info("Use val dataset")
             eval_dataset = self.val_data_loader#@jinhui
@@ -501,7 +509,9 @@ class FewShotREFramework:
         iter_right = 0.0
         iter_sample = 0.0
         with torch.no_grad():
+            eval_dataset.dict_val = {}
             for it in range(eval_iter):
+                  # jinhui check
                 try:
                     support, query, label, _ = next(eval_dataset)
                     if torch.cuda.is_available():
@@ -510,10 +520,26 @@ class FewShotREFramework:
                         for k in query:
                             query[k] = query[k].cuda()
                         label = label.cuda()
-                    logits, pred = model(support, query, N, K, Q * N + Q * na_rate)
+                    # logits, pred = model(support, query, N, K, Q * N + Q * na_rate)#@jinhui bug 5.7前着地方是这样子的
+
+                    if opt.encoder in ["roberta_newGraph", "bert_newGraph", "graph"]:
+                        #自定义的forward脱离了model.eval()的监督，导致梯度波动
+                        if opt.ignore_graph_feature:
+                            logits, pred = model.forwardWithIgnoreGraph(support, query, N, K,
+                                                                        Q * N + na_rate * Q)
+
+                        elif opt.ignore_bert_feature:  # 为了减少内存的使用，特意重写了一个sentence encoder（graph）
+                            logits, pred, graphFeatureRcon = model.forwardWithIgnoreBert(support, query, N, K,
+                                                                                         Q * N + na_rate * Q)
+                        else:
+                            logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N, K,
+                                                                                    Q * N + na_rate * Q)
+                    else:
+                        logits, pred = model(support, query, N, K, Q * N + na_rate * Q)
+
 
                     right = model.accuracy(pred, label)
-                    iter_right += self.item(right.data)
+                    iter_right += self.item(right.data)#除非这里包含这保留三位小数的操作
                     iter_sample += 1
 
                     sys.stdout.write(
@@ -524,4 +550,5 @@ class FewShotREFramework:
                     continue
             logger.info(
                         '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
+
         return iter_right / iter_sample

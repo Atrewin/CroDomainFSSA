@@ -4,7 +4,7 @@ import os
 import numpy as np
 import random
 import json
-
+from utils.logger import *
 
 class FewRelDataset(data.Dataset):
     """
@@ -128,6 +128,12 @@ class FewGraphDataset(data.Dataset):
                 indices = np.random.choice(
                     list(range(len(self.json_data[class_name]))),
                     self.K + self.Q, False)
+                # if index%100 < 10:
+                    # if class_name == "pos":
+                    #     prx = ""
+                    #     for indice in indices:
+                    #         prx += (str(indice) + "-")
+                        # print(str(index) + " " + class_name + ":         " + prx)#@jinhui check
                 count = 0
                 for j in indices:  # 如数据是进行了"neg", "pos"和并的
                     word = self.__getraw__(
@@ -144,7 +150,15 @@ class FewGraphDataset(data.Dataset):
                     count += 1
                 support_label += [i] * self.K
                 query_label += [i] * self.Q
+
+                # for i2 in indices:#@jinhui check
+                #     self.DICT[i2] = 1
+                #     self.dict_val[i2] = 1
         except:
+            # prx = ""
+            # for indice in indices:
+            #     prx += (str(indice) + "-")
+            # print("bad indices: " + prx)#@jinhui check
             index = random.randint(0,self.__len__())
             support_set, query_set, query_label, support_label = self.__getitem__(index)
 
@@ -201,14 +215,14 @@ def collate_fn(data):
 def get_loader(name, encoder, N, K, Q, batch_size, 
         num_workers=8, collate_fn=collate_fn, na_rate=0, root='./data/domain_data/processed_data', opt=None):
     dataset = FewGraphDataset(name, encoder, N, K, Q, na_rate, root, isNewGraphFeature=opt.isNewGraphFeature)#已经ID化 @jinhui 改变了FewRelDataset
-    temp = dataset[0]# 参看数据format
+    # temp = dataset[0]# 参看数据format
     data_loader = data.DataLoader(dataset=dataset,
             batch_size=batch_size,
             shuffle=False,
             pin_memory=True,
-            num_workers=num_workers,
+            num_workers=num_workers,# 这里的多线程会导致random到相同的值
             collate_fn=collate_fn)
-    return iter(data_loader)
+    return iter(data_loader)# 为什么初始化的时候会被读取一次
 
 
 

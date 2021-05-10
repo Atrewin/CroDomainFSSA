@@ -14,8 +14,8 @@ cd ../..
 CUDA_VISIBLE_DEVICES=2 PYTHONPATH=. python3 data/data_process_utils/data_extractor.py --pos_xml_url data/domain_data/init_data/dvd/positive.review --neg_xml_url data/domain_data/init_data/dvd/negative.review --keep_url data/domain_data/processed_data/dvd/dvd_reviews.json \
 --unlabeled_xml_url data/domain_data/init_data/dvd/unlabeled.review --unlabeled_keep_url data/domain_data/processed_data/dvd/dvd_unlabeled_reviews.json
 
-#CUDA_VISIBLE_DEVICES=2 PYTHONPATH=. python3 data/data_process_utils/data_extractor.py --pos_xml_url data/domain_data/init_data/electronics/positive.review --neg_xml_url data/domain_data/init_data/electronics/negative.review --keep_url data/domain_data/processed_data/electronics/electronics_reviews.json \
-#--unlabeled_xml_url data/domain_data/init_data/electronics/unlabeled.review --unlabeled_keep_url data/domain_data/processed_data/electronics/electronics_unlabeled_reviews.json
+CUDA_VISIBLE_DEVICES=2 PYTHONPATH=. python3 data/data_process_utils/data_extractor.py --pos_xml_url data/domain_data/init_data/electronics/positive.review --neg_xml_url data/domain_data/init_data/electronics/negative.review --keep_url data/domain_data/processed_data/electronics/electronics_reviews.json \
+--unlabeled_xml_url data/domain_data/init_data/electronics/unlabeled.review --unlabeled_keep_url data/domain_data/processed_data/electronics/electronics_unlabeled_reviews.json
 #
 #CUDA_VISIBLE_DEVICES=2 PYTHONPATH=. python3 data/data_process_utils/data_extractor.py --pos_xml_url data/domain_data/init_data/kitchenAndhousewares/positive.review --neg_xml_url data/domain_data/init_data/kitchenAndhousewares/negative.review --keep_url data/domain_data/processed_data/kitchenAndhousewares/kitchen_reviews.json \
 #--unlabeled_xml_url data/domain_data/init_data/kitchenAndhousewares/unlabeled.review --unlabeled_keep_url data/domain_data/processed_data/kitchenAndhousewares/kitchen_unlabeled_reviews.json

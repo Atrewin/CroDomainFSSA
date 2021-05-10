@@ -1,11 +1,14 @@
 # -*- coding:utf-8 -*
-import sys, io, os
+import sys, io
 from os.path import normpath,join,dirname
 
+# sys.getdefaultencoding()    # 查看设置前系统默认编码
+# sys.setdefaultencoding('utf-8')
+# sys.getdefaultencoding()    # 查看设置后系统默认编码
 # print("---"*15)
 # print(__file__)
 # print(normpath(join(dirname(__file__), '../..')), flush=True)# 指向的是你文件运行的路径，如果在命令行跑那么它是根据你启动的路径来确认的
-sys.path.append(normpath(join(os.path.dirname(os.path.abspath(__file__), '../..'))))
+sys.path.append(normpath(join(dirname(__file__), '../..')))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 # 命令行中带的坑： 要加个PYTHONPATH=. 指向python工程的根目录，就可以省去很多麻烦（这是pycharm帮我们集成了的）
 # 运行的环境路径和工程链接路径的差异性   #核心冲突，命令行认为的项目根目录和实际的项目根目录
@@ -13,7 +16,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 # 使用统一基于工程根目录的方式组织文件目录
 from utils.path_util import from_project_root
 from utils import json_util
-
+from data.data_process_utils.concept_util import getReviewConceptNetTriples
 
 import argparse
 
@@ -175,7 +178,7 @@ def getReviewJsons(rawReviews):
         tripleSelectet = 1
         try:
             concepts, opinionConceptTriples = getReviewConceptsAndTriples(review, nlp, tripleSelectet)
-        except KeyboardInterrupt:
+        except:
             print("一篇使得nlp(reviews)报错的文章--" + str(index) + "--\t--" + review)
             continue
         reviewJson = {"tokens": tokens,
@@ -240,12 +243,12 @@ def main():
 
     # 预处理 和 抽取文本的entities都封装到reviews2json内部因为entities的时候还需要使用到标点符号的分割
     # 将reviews转换成json结构 //包含tokens化；get entities
-    # json_data = reviews2json(pos_reviews, neg_reviews)
-    unlabeled_json_data = unlabeledReviews2json(unlabeled_reviews)
+    json_data = reviews2json(pos_reviews, neg_reviews)
+    # unlabeled_json_data = unlabeledReviews2json(unlabeled_reviews)
 
     # 保存数据
-    # json_util.dump(json_data, keep_url)
-    json_util.dump(unlabeled_json_data, unlabeled_keep_url)
+    json_util.dump(json_data, keep_url)
+    # json_util.dump(unlabeled_json_data, unlabeled_keep_url)
 
 
 if __name__ == '__main__':

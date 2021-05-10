@@ -59,9 +59,9 @@ class DAProtoNet(framework.FewShotREModel):
         # MSE = F.mse_loss(recon_x, x.view(-1, dim), reduction='mean')
                         # CEL = F.cross_entropy(recon_x, x.view(-1, dim), reduction='mean')# 因为recon_x是小数，并不是分类结果，所以不可以使用cross_entropy
                         # CEL = self.CrossEntropyLoss(recon_x, x)
-        cosine = torch.cosine_similarity(recon_x, x.view(-1, dim), dim=1)
-        CSD = torch.mean(cosine, 0)
-        return CSD
+        cosine_similarity = torch.cosine_similarity(recon_x, x.view(-1, dim), dim=1)
+        cosine_loss = torch.mean(cosine_similarity, 0)
+        return cosine_loss
 
 
     def forward(self, support, query, N, K, total_Q):
@@ -76,32 +76,6 @@ class DAProtoNet(framework.FewShotREModel):
         in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
         hidden_size = in_support_emb.size(-1)
 
-        # # graph feature maps
-        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        # support_graphFeature_maps = self.g1(support_graphFeature)# 也没有inplace operator
-        # query_graphFeature_maps = self.g1(query_graphFeature)
-        #
-        #
-        # sp_support_emb = torch.cat([sp_support_emb, support_graphFeature_maps], axis=1)
-        # sp_query_emb = torch.cat([sp_query_emb, query_graphFeature_maps], axis=1)
-        # sp_support_feat = self.fc2(sp_support_emb) # 按理说犯了inplace错误呀
-        # sp_query_feat = self.fc2(sp_query_emb)
-        #
-        # # end @jinhui
-
-
-        ## 单单使用graphfeature 作为sp_feature
-        # graph feature maps
-        # support_graphFeature, query_graphFeature = self.getGraphFeature(support, query)
-        # sp_support_emb = self.g1(support_graphFeature)# 也没有inplace operator
-        # sp_query_emb = self.g1(query_graphFeature)
-
-        # end @jinhui
-
-        ## 只使用in_encoder
-
-        # support_emb = self.featuretransfer(in_support_emb)
-        # query_emb = self.featuretransfer(in_query_emb)
         """
             学习领域不变特征  Learn Domain Invariant Feature
         """
@@ -155,15 +129,15 @@ class DAProtoNet(framework.FewShotREModel):
         reconGraphFeature = self.graphFeatureRecon(graphFeature_map)
 
         return logits, pred, reconGraphFeature
-
-    def forwardWithoutGraphFeature(self, support, query, N, K, total_Q):
-
+    def forwardWithIgnoreGraph(self, support, query, N, K, total_Q):
         in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
         in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
+
         hidden_size = in_support_emb.size(-1)
 
         support_emb = in_support_emb
         query_emb = in_query_emb
+
 
         support = self.drop(support_emb)
         query = self.drop(query_emb)
@@ -176,10 +150,40 @@ class DAProtoNet(framework.FewShotREModel):
         logits = self.__batch_dist__(support, query)  # (B, total_Q, N)
         minn, _ = logits.min(-1)
         logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
-        _, pred = torch.max(logits.view(-1, N + 1), 1)  # N + 1会有问题吗？
-
+        _, pred = torch.max(logits.view(-1, N + 1), 1)#N + 1会有问题吗？
 
 
         return logits, pred
+
+
+    def forwardWithIgnoreBert(self, support, query, N, K, total_Q):
+        in_support_emb, sp_support_emb = self.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
+        in_query_emb, sp_query_emb = self.sentence_encoder(query)  # (B * total_Q, D)
+
+        hidden_size = sp_support_emb.size(-1)
+
+        support_emb = sp_support_emb
+        query_emb = sp_query_emb
+
+
+        support = self.drop(support_emb)
+        query = self.drop(query_emb)
+        support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+        query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+        # Prototypical Networks
+        # Ignore NA policy
+        support = torch.mean(support, 2)  # Calculate prototype for each class
+        logits = self.__batch_dist__(support, query)  # (B, total_Q, N)
+        minn, _ = logits.min(-1)
+        logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+        _, pred = torch.max(logits.view(-1, N + 1), 1)#N + 1会有问题吗？
+
+        # 回购graph feature
+        support_graphFeature, query_graphFeature = sp_support_emb, sp_query_emb
+        graphFeature_map = torch.cat([support_graphFeature, query_graphFeature], 0)
+        reconGraphFeature = self.graphFeatureRecon(graphFeature_map)
+
+        return logits, pred, reconGraphFeature
 
 

@@ -291,8 +291,8 @@ class FewShotREFramework:
                     len_dataloader = 1000
                     n_epochs = 10000
                     p = float(it + it * len_dataloader) / n_epochs / len_dataloader
-                    alpha = 2. / (1. + np.exp(-10 * p)) - 1  # 必须大于0，不然梯度就没有反转了
 
+                    alpha = 2. / (1. + np.exp(-10 * p)) - 1  # 必须大于0，不然梯度就没有反转了
                 else:
                     alpha = 0
 

@@ -38,21 +38,11 @@ class RobertaSentenceEncoder(nn.Module):
 
     def forward(self, inputs):
 
-        # ## 方式一 使用CNN
-        # word_embed = self.in_roberta.extract_features(inputs['word'])#@jinhui 疑问：有没有办法可以限制它的更新？
-        # # word_embed = self.drop(word_embed)
-        # in_x = self.in_cnn_encoder(word_embed)
-        # sp_x = self.sp_cnn_encoder(word_embed)
-        #
-        # return in_x, sp_x
-        # # 方式二
+
         in_x = self._in_encoder(inputs)#B, S_N ,D
 
         return in_x
-        # # 方案三 调用分类器
-        # in_x = self.in_roberta.predict('emb_sentence',inputs['word'])#B, D
-        # sp_x = self.sp_roberta.predict('emb_sentence', inputs['word'])
-        # return  in_x, sp_x # 4,768
+
 
     def _in_encoder(self,inputs):
         in_x = self.in_roberta.extract_features(inputs['word'])[:, 1, :]  # B, S_N ,D
@@ -85,37 +75,24 @@ class BERTSentenceEncoder(nn.Module):
     def __init__(self, pretrain_path, max_length, cat_entity_rep=False, mask_entity=False):
         nn.Module.__init__(self)
         self.in_bert = BertModel.from_pretrained(pretrain_path)
-        self.sp_bert = BertModel.from_pretrained(pretrain_path)
         self.max_length = max_length
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.cat_entity_rep = cat_entity_rep
         self.mask_entity = mask_entity
         self.in_encoder = self._in_encoder
-        self.sp_encoder = self._sp_encoder
         self.in_cnn_encoder = network.CNNEncoder.cnnEncoder(max_length)
 
         # self.drop = nn.Dropout(0.2)
 
     def forward(self, inputs):
-        # 方式一
-        # word_embed, _ = self.bert(inputs['word'])
-        # word_embed = self.drop(word_embed)
-        # in_x = self.in_cnn_encoder(word_embed)
-        # sp_x = self.sp_cnn_encoder(word_embed)
-        # 方式二
+
         in_x = self._in_encoder(inputs)  # 是因为后面需要多态调用才增加的封装
 
-        # in_x = self.drop(in_x)
-        # sp_x = self.drop(sp_x)
         return in_x
 
     def _in_encoder(self, inputs):
         _, in_x = self.in_bert(inputs['word'])
         return in_x
-
-    def _sp_encoder(self, inputs):
-        _, sp_x = self.sp_bert(inputs['word'])
-        return sp_x
 
     def tokenize(self, raw_tokens):
         # token -> index

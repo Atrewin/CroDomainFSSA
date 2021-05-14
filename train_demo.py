@@ -46,6 +46,7 @@ def main():
     parser.add_argument('--fp16', action='store_true', help='use nvidia apex fp16')
     parser.add_argument('--only_test', action='store_true', help='only test')
     parser.add_argument('--ckpt_name', type=str, default='', help='checkpoint name.')
+    parser.add_argument('--visualization', action='store_true', help='do visualization')
 
     # only for bert / roberta
     parser.add_argument('--pretrain_ckpt', default=None, help='bert / roberta pre-trained checkpoint')
@@ -123,13 +124,13 @@ def main():
     logger.info("model: {}".format(model_name))
     logger.info("encoder: {}".format(encoder_name))
     logger.info("max_length: {}".format(max_length))
+    logger.info("ckpt_name: {}".format(opt.ckpt_name))
     logger.info("#"*30)
     logger.info("roberta: {}".format(opt.pretrain_ckpt))
     logger.info("Q: {}".format(opt.Q))
     logger.info("train: {}".format(opt.train))
     logger.info("val: {}".format(opt.val))
     logger.info("test: {}".format(opt.test))
-
     logger.info("start_train_prototypical: {}".format(opt.start_train_prototypical))
     logger.info("start_train_adv: {}".format(opt.start_train_adv))
     logger.info("start_train_dis: {}".format(opt.start_train_dis))
@@ -150,7 +151,8 @@ def main():
     val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     if opt.adv:
-        adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
+        # adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
+        adv_data_loader = None
     else:
         adv_data_loader = None
     if opt.optim == 'sgd':
@@ -162,7 +164,6 @@ def main():
         pytorch_optim = AdamW
     else:
         raise NotImplementedError
-
     # 领域二分类器
     d = Discriminator(opt.hidden_size)
     sen_D = Sen_Discriminator(opt.hidden_size)# 是这里开始变慢了？
@@ -180,34 +181,40 @@ def main():
 
     if torch.cuda.is_available():
         model.cuda()# 疑问 这一句有成功tocuda吗？
-    try:
 
-        if not opt.only_test:
-            if encoder_name in ['bert', 'roberta', "roberta_newGraph","bert_newGraph"]:
-                bert_optim = True
-            else:
-                bert_optim = False
-
-            if opt.lr == -1:
-                if bert_optim:
-                    opt.lr = 2e-5
-                else:
-                    opt.lr = 1e-1
-            # @jinhui 这里的传参模式不符合面向对象程序设计思想, 建议作为属性成员传入framework
-            framework.train(model, prefix, batch_size, trainN, N, K, Q,
-                    pytorch_optim=pytorch_optim, load_ckpt=opt.load_ckpt, save_ckpt=ckpt,
-                    na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,
-                    train_iter=opt.train_iter, val_iter=opt.val_iter, bert_optim=bert_optim,
-                    learning_rate=opt.lr, use_sgd_for_bert=opt.use_sgd_for_bert, opt=opt)
+    if not opt.only_test:
+        if encoder_name in ['bert', 'roberta', "roberta_newGraph","bert_newGraph"]:
+            bert_optim = True
         else:
-            ckpt = opt.load_ckpt
-            if ckpt is None:
-                logger.info("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
-                ckpt = 'none'
-    except RuntimeError:# 提前中断，执行最终测试
+            bert_optim = False
 
-        logger.info(traceback.print_exc())
+        if opt.lr == -1:
+            if bert_optim:
+                opt.lr = 2e-5
+            else:
+                opt.lr = 1e-1
+        # @jinhui 这里的传参模式不符合面向对象程序设计思想, 建议作为属性成员传入framework
+        framework.train(model, prefix, batch_size, trainN, N, K, Q,
+                pytorch_optim=pytorch_optim, load_ckpt=opt.load_ckpt, save_ckpt=ckpt,
+                na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,
+                train_iter=opt.train_iter, val_iter=opt.val_iter, bert_optim=bert_optim,
+                learning_rate=opt.lr, use_sgd_for_bert=opt.use_sgd_for_bert, opt=opt)
+
+
+    elif not opt.visualization:
+        ckpt = opt.load_ckpt
+        if ckpt is None:
+            logger.info("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
+            ckpt = 'none'
         acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, opt=opt)
+        logger.info("RESULT: %.2f" % (acc * 100))
+    else:
+        ckpt = opt.load_ckpt
+        if ckpt is None:
+            logger.info("Warning: --load_ckpt is not specified. Will load Hugginface pre-trained checkpoint.")
+            ckpt = 'none'
+
+        acc = framework.visual(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, opt=opt)
         logger.info("RESULT: %.2f" % (acc * 100))
 
     acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, opt=opt)

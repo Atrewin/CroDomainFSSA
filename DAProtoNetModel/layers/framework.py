@@ -13,7 +13,8 @@ from torch.nn import functional as F
 from transformers import AdamW, get_linear_schedule_with_warmup
 import traceback
 from utils.logger import *
-
+from utils.view import *
+from utils.json_util import *
 def warmup_linear(global_step, warmup_step):
     if global_step < warmup_step:
         return global_step / warmup_step
@@ -274,7 +275,7 @@ class FewShotREFramework:
             graphFeature = torch.cat([support_graphFeature, query_graphFeature], 0)
 
             if it > opt.start_train_prototypical:
-                optimizer.zero_grad()#防止eval()的时候发生波动
+
                 # 调用模型 # Prototypical 的输出 (B, total_Q, N + 1)
                 if opt.encoder in ["roberta_newGraph","bert_newGraph", "graph"]:
 
@@ -455,6 +456,7 @@ class FewShotREFramework:
 
                 acc = self.eval(model, B, N_for_eval, K, Q, val_iter,
                                 na_rate=na_rate, opt=opt)
+                optimizer.zero_grad()  # 防止eval()的时候发生波动
                 model.train()
                 if acc > best_acc:
                     logger.info('Best checkpoint')
@@ -473,8 +475,88 @@ class FewShotREFramework:
         logger.info("\n####################\n")
         logger.info("Finish training " + model_name)
 
-
     def eval(self,
+               model,
+               B, N, K, Q,
+               eval_iter,
+               na_rate=0,
+               ckpt=None, opt=None):
+        '''
+        model: a FewShotREModel instance
+        B: Batch size
+        N: Num of classes for each batch
+        K: Num of instances for each class in the support set
+        Q: Num of instances for each class in the query set
+        eval_iter: Num of iterations
+        ckpt: Checkpoint path. Set as None if using current model parameters.
+        return: Accuracy
+        '''
+        # print("")
+        model.eval()  # @jinhui 难道这里model.eval() ：不启用 BatchNormalization 和 Dropout 但是如果使用的是self.training = mode 估计只是作用到了model.forward()函数上了
+        if ckpt is None:
+            logger.info("Use val dataset")
+            eval_dataset = self.val_data_loader  # @jinhui
+        else:
+            logger.info("Use test dataset")
+            if ckpt != 'none':
+
+                state_dict = self.__load_model__(ckpt)['state_dict']
+                own_state = model.state_dict()
+                for name, param in state_dict.items():
+                    if name not in own_state:
+                        continue
+                    own_state[name].copy_(param)
+            eval_dataset = self.test_data_loader
+
+        iter_right = 0.0
+        iter_sample = 0.0
+        with torch.no_grad():
+            eval_dataset.dict_val = {}
+            for it in range(eval_iter):
+                # jinhui check
+                try:
+                    support, query, label, _ = next(eval_dataset)
+                    if torch.cuda.is_available():
+                        for k in support:
+                            support[k] = support[k].cuda()
+                        for k in query:
+                            query[k] = query[k].cuda()
+                        label = label.cuda()
+                    # logits, pred = model(support, query, N, K, Q * N + Q * na_rate)#@jinhui bug 5.7前着地方是这样子的
+
+                    if opt.encoder in ["roberta_newGraph", "bert_newGraph", "graph"]:
+                        # 自定义的forward脱离了model.eval()的监督，导致梯度波动
+                        if opt.ignore_graph_feature:
+                            logits, pred = model.forwardWithIgnoreGraph(support, query, N, K,
+                                                                        Q * N + na_rate * Q)
+
+                        elif opt.ignore_bert_feature:  # 为了减少内存的使用，特意重写了一个sentence encoder（graph）
+                            logits, pred, graphFeatureRcon = model.forwardWithIgnoreBert(support, query, N, K,
+                                                                                         Q * N + na_rate * Q)
+                        else:
+                            logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N, K,
+                                                                                    Q * N + na_rate * Q)
+                    else:
+                        logits, pred = model(support, query, N, K, Q * N + na_rate * Q)
+
+                    right = model.accuracy(pred, label)
+                    iter_right += self.item(right.data)  # 除非这里包含这保留三位小数的操作
+                    iter_sample += 1
+
+                    sys.stdout.write(
+                        '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1,
+                                                                          100 * iter_right / iter_sample) + '\r')
+                    sys.stdout.flush()
+                except RuntimeError:
+                    logger.info(it)
+                    continue
+            logger.info(
+                '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
+
+        return iter_right / iter_sample
+
+
+    def visual(self,
              model,
              B, N, K, Q,
              eval_iter,
@@ -498,7 +580,9 @@ class FewShotREFramework:
         else:
             logger.info("Use test dataset")
             if ckpt != 'none':
-                state_dict = self.__load_model__(ckpt)['state_dict']
+                if "checkpoint/" not in ckpt:
+                    ckpt1 = "checkpoint/" + ckpt
+                state_dict = self.__load_model__(ckpt1)['state_dict']
                 own_state = model.state_dict()
                 for name, param in state_dict.items():
                     if name not in own_state:
@@ -509,7 +593,17 @@ class FewShotREFramework:
         iter_right = 0.0
         iter_sample = 0.0
         with torch.no_grad():
-            eval_dataset.dict_val = {}
+            storage_list = {
+                "S_domain": {
+                    "positive": [],
+                    "negative": []
+                },
+                "T_domain": {
+                    "positive": [],
+                    "negative": []
+                }
+            }
+            tips = True
             for it in range(eval_iter):
                   # jinhui check
                 try:
@@ -525,18 +619,171 @@ class FewShotREFramework:
                     if opt.encoder in ["roberta_newGraph", "bert_newGraph", "graph"]:
                         #自定义的forward脱离了model.eval()的监督，导致梯度波动
                         if opt.ignore_graph_feature:
-                            logits, pred = model.forwardWithIgnoreGraph(support, query, N, K,
-                                                                        Q * N + na_rate * Q)
+                            total_Q = Q * N + na_rate * Q
+                            in_support_emb, sp_support_emb = model.sentence_encoder(
+                                support)  # (B * N * K, D), where D is the hidden size
+                            in_query_emb, sp_query_emb = model.sentence_encoder(query)  # (B * total_Q, D)
+
+                            hidden_size = in_support_emb.size(-1)
+
+                            support_emb = in_support_emb
+                            query_emb = in_query_emb
+
+                            support = model.drop(support_emb)
+                            query = model.drop(query_emb)
+                            support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+                            query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+                            # Prototypical Networks
+                            # Ignore NA policy
+                            support = torch.mean(support, 2)  # Calculate prototype for each class
+                            logits = model.__batch_dist__(support, query)  # (B, total_Q, N)
+                            minn, _ = logits.min(-1)
+                            logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+                            _, pred = torch.max(logits.view(-1, N + 1), 1)  # N + 1会有问题吗？
+
+                            # TODO visualization
+
+                            # to list
+
+                            if it < 500:
+                                support_emb = support_emb.reshape(N, K, hidden_size)
+                                points = support_emb.tolist()
+                                storage_list["T_domain"]["positive"].extend(points[0])
+                                storage_list["T_domain"]["negative"].extend(points[1])
+                            else:
+                                if tips:
+                                    eval_dataset = self.test_data_loader
+                                    tips = False
+                                    continue
+
+                                support_emb = support_emb.reshape(N, K, hidden_size)
+                                points = support_emb.tolist()
+                                storage_list["S_domain"]["positive"].extend(points[0])
+                                storage_list["S_domain"]["negative"].extend(points[1])
+
+                                if it > 998:
+                                    keep = opt.encoder + opt.notes + ".json"
+                                    dump(storage_list, keep)
+                                    break
 
                         elif opt.ignore_bert_feature:  # 为了减少内存的使用，特意重写了一个sentence encoder（graph）
                             logits, pred, graphFeatureRcon = model.forwardWithIgnoreBert(support, query, N, K,
                                                                                          Q * N + na_rate * Q)
                         else:
-                            logits, pred, graphFeatureRcon = model.forwardWithRecon(support, query, N, K,
-                                                                                    Q * N + na_rate * Q)
-                    else:
-                        logits, pred = model(support, query, N, K, Q * N + na_rate * Q)
+                            total_Q = Q * N + na_rate * Q
+                            in_support_emb, sp_support_emb = model.sentence_encoder(support)  # (B * N * K, D), where D is the hidden size
+                            in_query_emb, sp_query_emb = model.sentence_encoder(query)  # (B * total_Q, D)
+                            hidden_size = in_support_emb.size(-1)
 
+                            support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
+                            query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
+                            support_emb = model.fc(support_emb)
+                            query_emb = model.fc(query_emb)
+
+                            # support = model.drop(support_emb)
+                            # query = model.drop(query_emb)
+                            support = support_emb
+                            query = query_emb
+                            support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+                            query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+                            # Prototypical Networks
+                            # Ignore NA policy
+                            Proto_support = torch.mean(support, 2)  # Calculate prototype for each class
+                            logits = model.__batch_dist__(Proto_support, query)  # (B, total_Q, N)
+                            minn, _ = logits.min(-1)
+                            logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+                            _, pred = torch.max(logits.view(-1, N + 1), 1)  # N + 1会有问题吗？
+
+                            #TODO visualization
+
+                            #to list
+
+                            if it < 500:
+                                support_emb = support_emb.reshape(N, K, hidden_size)
+                                points = support_emb.tolist()
+                                storage_list["T_domain"]["positive"].extend(points[0])
+                                storage_list["T_domain"]["negative"].extend(points[1])
+                            else:
+                                if tips:
+                                    eval_dataset = self.test_data_loader
+                                    tips = False
+                                    continue
+
+                                support_emb = support_emb.reshape(N, K, hidden_size)
+                                points = support_emb.tolist()
+                                storage_list["S_domain"]["positive"].extend(points[0])
+                                storage_list["S_domain"]["negative"].extend(points[1])
+
+                                if it > 998:
+                                    keep = opt.encoder + opt.notes + ".json"
+                                    dump(storage_list, keep)
+                                    break
+
+
+
+
+                            # 采用先保存的方案
+
+                            # proto_points = proto_points.reshape(-1, 768).tolist()
+                            # points_d, proto_points_d = view_on_two_dim(points, proto_points)
+                            # mean = cal_mean(points_d, proto_points_d)
+                            # R, mean_R = calc_radius(points_d, proto_points_d, scale=mean)#point_d
+
+                    else:
+                        # logits, pred = model(support, query, N, K, Q * N + na_rate * Q)
+                        total_Q = Q * N + na_rate * Q
+                        in_support_emb, sp_support_emb = model.sentence_encoder(
+                            support)  # (B * N * K, D), where D is the hidden size
+                        in_query_emb, sp_query_emb = model.sentence_encoder(query)  # (B * total_Q, D)
+                        hidden_size = in_support_emb.size(-1)
+
+                        """
+                            学习领域不变特征  Learn Domain Invariant Feature
+                        """
+                        support_emb = torch.cat([in_support_emb, sp_support_emb], axis=1)  # (B*N*K, 2D)
+                        query_emb = torch.cat([in_query_emb, sp_query_emb], axis=1)  # (B*Q*N, 2D)
+                        support_emb = model.fc(support_emb)
+                        query_emb = model.fc(query_emb)
+
+                        support = model.drop(support_emb)
+                        query = model.drop(query_emb)
+                        support = support.view(-1, N, K, hidden_size)  # (B, N, K, D)
+                        query = query.view(-1, total_Q, hidden_size)  # (B, total_Q, D)
+
+                        # Prototypical Networks
+                        # Ignore NA policy
+                        Proto_support = torch.mean(support, 2)  # Calculate prototype for each class
+                        logits = model.__batch_dist__(Proto_support, query)  # (B, total_Q, N)
+                        minn, _ = logits.min(-1)
+                        logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2)  # (B, total_Q, N + 1)
+                        _, pred = torch.max(logits.view(-1, N + 1), 1)
+
+                        # TODO visualization
+
+                        # to list
+
+                        if it < 500:
+                            support_emb = support_emb.reshape(N, K, hidden_size)
+                            points = support_emb.tolist()
+                            storage_list["T_domain"]["positive"].extend(points[0])
+                            storage_list["T_domain"]["negative"].extend(points[1])
+                        else:
+                            if tips:
+                                eval_dataset = self.test_data_loader
+                                tips = False
+                                continue
+
+                            support_emb = support_emb.reshape(N, K, hidden_size)
+                            points = support_emb.tolist()
+                            storage_list["S_domain"]["positive"].extend(points[0])
+                            storage_list["S_domain"]["negative"].extend(points[1])
+
+                            if it > 998:
+                                keep = opt.encoder + opt.notes + ".json"
+                                dump(storage_list, keep)
+                                break
 
                     right = model.accuracy(pred, label)
                     iter_right += self.item(right.data)#除非这里包含这保留三位小数的操作
@@ -552,3 +799,4 @@ class FewShotREFramework:
                         '[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) + '\r')
 
         return iter_right / iter_sample
+

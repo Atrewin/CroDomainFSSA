@@ -6,7 +6,7 @@ from os import makedirs
 import time
 
 # to get the absolute path of current project
-project_root_url = normpath(join(dirname(__file__), '..'))# 或许这一句应该写成是绝对路径的方式
+project_root_url = normpath(join(dirname(__file__), '..'))
 
 
 def from_project_root(rel_path, create=True):

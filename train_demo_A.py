@@ -2,7 +2,7 @@ from torch import optim
 from utils.model_utils import *
 import datetime, torch
 import argparse
-from DAProtoNetModel.layers.data_loader import get_loader, get_loader_unsupervised
+from DAProtoNetModel.layers.data_loader_A import get_loader, get_loader_unsupervised,get_loader_val
 from DAProtoNetModel.layers.framework_A import FewShotREFramework
 from DAProtoNetModel.layers.sentence_encoder_A import *  #改
 from DAProtoNetModel.layers.DAPostBertNet_A import DAPostBertNet
@@ -93,6 +93,7 @@ def main():
 
 
     logger.info("{}-way-{}-shot Few-Shot Relation Classification".format(N, K))
+    logger.info("log_path: {}".format(log_path))
     logger.info("model: {}".format(model_name))
     logger.info("encoder: {}".format(encoder_name))
     logger.info("max_length: {}".format(max_length))
@@ -113,12 +114,10 @@ def main():
 
     train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate,
                                    batch_size=batch_size)
-    val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-    test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-    if opt.adv:
-        adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate,
-                                                  batch_size=batch_size)
+    val_data_loader = get_loader_val(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, data_mode="val")
+    test_data_loader = get_loader_val(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, data_mode="test")
 
+    adv_data_loader = None
     if opt.optim == 'sgd':
         pytorch_optim = optim.SGD
     elif opt.optim == 'adam':

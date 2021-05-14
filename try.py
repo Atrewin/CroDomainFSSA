@@ -273,16 +273,20 @@ def demoForGetConcepTriple():
     pass
 
 if __name__ == "__main__":
-    demoForGetConcepTriple()
+
 
     pass
 
-import traceback
+    import traceback
 
-try:
+    try:
 
-    pass
-except:
 
-    print(traceback.print_exc())
-    pass
+
+
+        print("")
+        pass
+    except:
+
+        print(traceback.print_exc())
+        pass

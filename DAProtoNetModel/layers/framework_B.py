@@ -56,9 +56,9 @@ class FewShotREModel(nn.Module):
         return torch.mean((pred.view(-1) == label.view(-1)).type(torch.FloatTensor))
 
 
-class FewShotREFramework:
+class SentimentFramework:
 
-    def __init__(self, train_data_loader, val_data_loader, test_data_loader, adv_data_loader=None, adv=False, d=None,
+    def __init__(self, train_data_loader, val_data_loader, test_data_loader, sentence_encoder=None, adv_data_loader=None, adv=False, d=None,
                  sen_d=None, sen_sp_D=None):
         '''
         train_data_loader: DataLoader for training.
@@ -71,7 +71,8 @@ class FewShotREFramework:
         self.test_data_loader = test_data_loader
         self.adv_data_loader = adv_data_loader
         self.adv = adv
-
+        self.sentence_encoder = sentence_encoder
+        self.sen_d = sen_d
         #准备训练模型
         if adv:
             self.adv_cost = nn.CrossEntropyLoss()
@@ -80,11 +81,6 @@ class FewShotREFramework:
             self.d.cuda()# 不应该在这里tocuda
             self.sen_d = sen_d
             self.sen_d.cuda()
-            # self.sen_sp_D = sen_sp_D
-            # self.sen_sp_D.cuda()
-
-        # 准备训练优化器（放到了train阶段）
-
     def __load_model__(self, ckpt):
         '''
         ckpt: Path of the checkpoint
@@ -161,12 +157,27 @@ class FewShotREFramework:
 
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             # @jinhui 疑问点: 这里为什么要这样设置leanable parameters weight_decay
+            # parameters_to_optimize = [
+            #     {'params': [p for n, p in parameters_to_optimize
+            #                 if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+            #     {'params': [p for n, p in parameters_to_optimize
+            #                 if any(nd in n for nd in no_decay)], 'weight_decay': 0.0001}
+            # ]
+
+            ###
+            low_lr = ["sentence_encoder"]
             parameters_to_optimize = [
                 {'params': [p for n, p in parameters_to_optimize
-                            if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+                            if (not any(nd in n for nd in no_decay)) and (any(low in n for low in low_lr))], 'weight_decay': 0.01, 'lr': 1e-5},
                 {'params': [p for n, p in parameters_to_optimize
-                            if any(nd in n for nd in no_decay)], 'weight_decay': 0.0001}
+                            if any(nd in n for nd in no_decay) and (any(low in n for low in low_lr))], 'weight_decay': 0.0, 'lr': 1e-5},
+                {'params': [p for n, p in parameters_to_optimize
+                            if (not any(nd in n for nd in no_decay)) and (not any(low in n for low in low_lr))],'weight_decay': 0.01, 'lr': 1e-4},# bert之外的人应该有更多的学习率
+                {'params': [p for n, p in parameters_to_optimize
+                            if any(nd in n for nd in no_decay) and (not any(low in n for low in low_lr))], 'weight_decay': 0.0, 'lr': 1e-4}
             ]
+            ###
+
 
             # 优化器和参数绑定
             if use_sgd_for_bert:
@@ -175,30 +186,11 @@ class FewShotREFramework:
                 optimizer = AdamW(parameters_to_optimize, lr=learning_rate, correct_bias=False)
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
                                                         num_training_steps=train_iter)
-
-            # @jinhui 疑惑:这里不会导致parameters_to_optimize和多个optimizer绑定吗?
-            # if self.adv:
-            #     optimizer_encoder = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)# 应该只限制到
-
         else:
             optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
 
-            # if self.adv:
-            #     not_upgrade_params = ["fc.weight", "fc.bias"]  # 怎么知道这两参数不用更新的
-            #     for name, param in model.named_parameters():  # 指针对象?
-            #         if name in not_upgrade_params:
-            #             param.requires_grad = False
-            #         else:
-            #             param.requires_grad = True
-            #     optimizer_encoder = pytorch_optim(model.parameters(), lr=adv_enc_lr)
-
-
-        if self.adv:
-            # optimizer_dis = AdamW(self.d.parameters(), lr=adv_dis_lr, correct_bias=False)
-            optimizer_dis = pytorch_optim(self.d.parameters(), lr=adv_dis_lr)
-            optimizer_sen_dis = pytorch_optim(self.sen_d.parameters(), lr=adv_dis_lr)
-            # optimizer_sen_dis = AdamW(self.sen_d.parameters(), lr=adv_dis_lr, correct_bias=False)
+        optimizer_sen_dis = pytorch_optim(self.sen_d.parameters(), lr=adv_dis_lr)
         if load_ckpt:
             load_ckpt = save_ckpt
             state_dict = self.__load_model__(load_ckpt)['state_dict']
@@ -232,64 +224,58 @@ class FewShotREFramework:
         iter_dis = 1
 
         right_dis = 1
-
-        for it in range(start_iter, start_iter + train_iter):
+        it = 0
+        for epoch in range(start_iter, start_iter + train_iter):
             # optimizer.zero_grad()  # 防止eval()的时候发生波动
-            support, support_label, query, label = next(self.train_data_loader)
-            if torch.cuda.is_available():  # @jinhui 疑惑 为什么要分开to cuda
-                for k in support:#k =word, graph
-                    support[k] = support[k].cuda()
-                for k in query:
-                    query[k] = query[k].cuda()
+            for step, (support, support_label) in enumerate(self.train_data_loader):
 
-                # label = label.cuda()
-                support_label = support_label.cuda()
+                query = None
+                if torch.cuda.is_available():
+                    support["word"] = support["word"].cuda()
+                    label = support_label.cuda()# @改
+                logits, pred = model(support, query, N_for_train, K,  Q * N_for_train + na_rate * Q)  # 是只用support
 
+                loss = model.loss(logits, label) / float(grad_iter)#改
 
-            logits, pred= model(support, query, N_for_train, K,
-                                                                    Q * N_for_train + na_rate * Q)
-            loss = model.loss(logits, support_label) / float(grad_iter)#改
+                right = model.accuracy(pred, label)
+                if fp16:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                    # torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 10)
+                else:
+                    # sum_loss = loss
+                    loss.backward(retain_graph=True)
 
-            right = model.accuracy(pred, support_label)
-            if fp16:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-                # torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 10)
-            else:
-                # sum_loss = loss
-                loss.backward(retain_graph=True)
-
-                # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
-
-            if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
+                it += 1
+                # if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
                 torch.cuda.empty_cache()
 
-            iter_loss += self.item(loss.data)
-            iter_right += self.item(right.data)
-            iter_proto += 1
-            # @jinhui 疑惑: 感觉上面流程已经结束, 为什么还要对抗?
+                iter_loss += self.item(loss.data)
+                iter_right += self.item(right.data)
+                iter_proto += 1
+                # @jinhui 疑惑: 感觉上面流程已经结束, 为什么还要对抗?
 
 
-            if self.adv:
-                sys.stdout.write(
-                    'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_in_acc: {5:2.6f}, sen_sp_acc: {5:2.6f}'
-                    .format(it + 1, iter_loss / iter_proto,
-                            100 * iter_right / iter_proto,
-                            iter_loss_dis / iter_dis,
-                            100 * iter_right_dis / iter_dis,
-                            100 * iter_sen_right_dis / iter_dis,
-                            100 * iter_sen_right_sp / iter_dis,) + '\r')
-            else:
-                sys.stdout.write(
-                    'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%'.format(it + 1, iter_loss / iter_proto,
-                                                                               100 * iter_right / iter_proto) + '\r')
-            sys.stdout.flush()
+                if self.adv:
+                    sys.stdout.write(
+                        'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_in_acc: {5:2.6f}, sen_sp_acc: {5:2.6f}'
+                        .format(it + 1, iter_loss / iter_proto,
+                                100 * iter_right / iter_proto,
+                                iter_loss_dis / iter_dis,
+                                100 * iter_right_dis / iter_dis,
+                                100 * iter_sen_right_dis / iter_dis,
+                                100 * iter_sen_right_sp / iter_dis,) + '\r')
+                else:
+                    sys.stdout.write(
+                        'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%'.format(it + 1, iter_loss / iter_proto,
+                                                                                   100 * iter_right / iter_proto) + '\r')
+                sys.stdout.flush()
 
-            if (it + 1) % val_step == 0:
-
+            if (epoch + 1) % val_step == 0:
+            ### TODO val_step
                 if self.adv:
                     logger.info(
                         'step: {0:4} | loss: {1:2.6f}, accuracy: {2:3.2f}%, dis_loss: {3:2.6f}, dis_acc: {4:2.6f}, sen_in_acc: {5:2.6f}, sen_sp_acc: {5:2.6f}'
@@ -306,7 +292,7 @@ class FewShotREFramework:
 
                 acc = self.eval(model, B, N_for_eval, K, Q, val_iter,
                                 na_rate=na_rate,opt=opt)
-                # optimizer.zero_grad()  # 防止eval()的时候发生波动, 会导致训练不起来
+                optimizer.zero_grad()  # 防止eval()的时候发生波动, 会导致训练不起来
                 print("zero_grad_after_eval")
                 model.train()
                 if acc > best_acc:
@@ -364,12 +350,10 @@ class FewShotREFramework:
         with torch.no_grad():
             for it, (support, support_label) in enumerate(eval_dataset):
                 try:
-                    batch_support = support
-                    support = {}
                     query  = None
                     if torch.cuda.is_available():
-                        support["word"] = torch.stack(batch_support, 0).view(-1,opt.max_length).cuda()
-                        label = torch.tensor(support_label).cuda()#@改
+                        support["word"] = support["word"].cuda()
+                        label = support_label.cuda()
                     logits, pred = model(support, query, N, K, Q * N + Q * na_rate)# 是只用support
 
                     right = model.accuracy(pred, label)

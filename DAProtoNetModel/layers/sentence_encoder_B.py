@@ -91,7 +91,7 @@ class BERTSentenceEncoder(nn.Module):
         return in_x
 
     def _in_encoder(self, inputs):
-        _, in_x = self.in_bert(inputs['word'])# 为什么没有padding input？
+        _, in_x = self.in_bert(inputs['word'])
         return in_x
 
     def tokenize(self, raw_tokens):

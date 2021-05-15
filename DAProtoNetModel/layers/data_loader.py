@@ -202,7 +202,7 @@ def collate_fn(data):
         batch_label += query_labels[i]
         batch_support_lsbels += support_lsbels[i]
 
-    for k in batch_support:
+    for k in batch_support:# k = ["word", "graphFeature"]
         batch_support[k] = torch.stack(batch_support[k], 0)
     for k in batch_query:
         batch_query[k] = torch.stack(batch_query[k], 0)

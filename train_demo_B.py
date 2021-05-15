@@ -2,10 +2,10 @@ from torch import optim
 from utils.model_utils import *
 import datetime, torch
 import argparse
-from DAProtoNetModel.layers.data_loader_A import get_loader, get_loader_unsupervised,get_loader_val
-from DAProtoNetModel.layers.framework_A import FewShotREFramework
-from DAProtoNetModel.layers.sentence_encoder_A import *  #改
-from DAProtoNetModel.layers.DAPostBertNet_A import DAPostBertNet
+from DAProtoNetModel.layers.data_loader_B import get_loader_val
+from DAProtoNetModel.layers.framework_B import SentimentFramework
+from DAProtoNetModel.layers.sentence_encoder_B import *  #改
+from DAProtoNetModel.layers.DAPostBertNet_B import DAPostBertNet
 from DAProtoNetModel.layers.d import Discriminator
 from DAProtoNetModel.layers.sen_d import Sen_Discriminator, Sen_Discriminator_sp
 import traceback
@@ -86,7 +86,7 @@ def main():
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
 
     nowTime = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_path = os.path.join(LOG_PATH, "A" + prefix + opt.notes + nowTime + ".txt")
+    log_path = os.path.join(LOG_PATH,"B" + prefix + opt.notes + nowTime + ".txt")
     file_handler = logging.FileHandler(log_path)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
@@ -112,8 +112,8 @@ def main():
 
     model = DAPostBertNet(sentence_encoder, opt.hidden_size, dot=opt.dot)#改
 
-    train_data_loader = get_loader(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate,
-                                   batch_size=batch_size)
+    train_data_loader = get_loader_val(opt.train, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate,
+                                   batch_size=batch_size,data_mode="train")
     val_data_loader = get_loader_val(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, data_mode="val")
     test_data_loader = get_loader_val(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, data_mode="test")
 
@@ -132,8 +132,7 @@ def main():
     d = Discriminator(opt.hidden_size)
     sen_D = Sen_Discriminator(opt.hidden_size)  # 是这里开始变慢了？
     sen_sp_D = Sen_Discriminator_sp(opt.hidden_size)
-    framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader,
-                                   adv_data_loader=adv_data_loader, adv=opt.adv, d=d, sen_d=sen_D, sen_sp_D=sen_sp_D)
+    framework = SentimentFramework(train_data_loader, val_data_loader, test_data_loader, sentence_encoder=model, sen_d=sen_D)
 
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
 

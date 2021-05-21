@@ -18,7 +18,7 @@ class Embedding(nn.Module):
         # blk = torch.zeros(1, word_embedding_dim)
         word_vec_mat = torch.from_numpy(word_vec_mat)
         self.word_embedding = nn.Embedding(word_vec_mat.shape[0], self.word_embedding_dim, padding_idx=word_vec_mat.shape[0] - 1)
-        self.word_embedding.weight.data.copy_(word_vec_mat)
+        self.word_embedding.weight.data.copy_(word_vec_mat)# 貌似不可train
 
         # Position Embedding
         self.pos1_embedding = nn.Embedding(2 * max_length, pos_embedding_dim, padding_idx=0)
@@ -30,7 +30,7 @@ class Embedding(nn.Module):
         # x = torch.cat([self.word_embedding(word),
         #                     self.pos1_embedding(pos1),
         #                     self.pos2_embedding(pos2)], 2)
-        x = self.word_embedding(word)
+        x = self.word_embedding(word)# x = nan,nan
         return x
 
 

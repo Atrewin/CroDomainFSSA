@@ -28,14 +28,14 @@ class EvalDataset(data.Dataset):
         self.encoder = encoder  # @jinhui 用来index id 化
 
     def __getraw__(self, item):
-        word = self.encoder.tokenize(item['tokens'])  # 单词下标化
-        return word
+        word, attention_mask = self.encoder.tokenize(item['tokens'])  # 单词下标化
+        return word, attention_mask
     def part_data(self,data_mode):
         target_classes = ["pos", "neg"]
         spilt = [0.5, 0.7]
-        if "test" == data_mode:
+        if data_mode == "test":
             spilt = [0.7, 1]
-        if "val" == data_mode:
+        if data_mode == "val":
             spilt = [0.5, 0.7]
         if data_mode == "train":
             spilt = [0, 0.5]
@@ -43,21 +43,24 @@ class EvalDataset(data.Dataset):
             length = 1000#len(self.json_data[class_name]) 有异步问题
             self.json_data[class_name] = self.json_data[class_name][int(length*spilt[0]):int(length*spilt[1])]
 
-    def __additem__(self, d, word):
+    def __additem__(self, d, word,attention_mask):
         d['word'].append(word)
+        d["attention_mask"].append(attention_mask)
 
     def __getitem__(self, index):
         target_classes = ["pos", "neg"]  # 固定为[pos, neg], 那么意味着pos的index为0，neg的index为1。
-        support_set = {'word': []}
+        support_set = {'word': [],
+                       "attention_mask": []}
         support_label = []
 
         for i, class_name in enumerate(target_classes):
             indices = [index]
             for j in indices:
-                word = self.__getraw__(
+                word, attention_mask = self.__getraw__(
                     self.json_data[class_name][j])
                 word = torch.tensor(word).long()
-                self.__additem__(support_set, word)
+                attention_mask = torch.tensor(attention_mask).long()
+                self.__additem__(support_set, word,attention_mask)
             support_label += [i]
 
         return support_set, support_label
@@ -83,14 +86,31 @@ def getDatesetFilePath(root, name):
 
 
 def collate_eval_fn(data):
-    batch_support = {'word': []}
+    batch_support = {}
     batch_support_labels = []
 
+    random.shuffle(data)
+
     support_sets, support_labels= zip(*data)
+    for key in support_sets[0]:
+        batch_support[key] = []
+
+
     for i in range(len(support_sets)):# i = batch
         for k in support_sets[i]:# k = ["word", "graphFeature"]
             batch_support[k] += support_sets[i][k]
+
         batch_support_labels += support_labels[i]
+
+    randseed = random.randint(0, 10000)#@jinhui 要确保label对齐
+    for k in batch_support:
+        random.seed(randseed)
+        random.shuffle(batch_support[k])
+
+    random.seed(randseed)
+    random.shuffle(batch_support_labels)
+    # 随机打乱数据，避免出现[0,1,0,1,0,1]的规律
+
 
     for k in batch_support:
         batch_support[k] = torch.stack(batch_support[k], 0)

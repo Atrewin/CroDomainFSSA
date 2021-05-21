@@ -19,14 +19,16 @@ class DAPostBertNet(framework.FewShotREModel):
 
         # TODO jinhui
         # graph feature map
-
-        self.sentimentClassifier =  nn.Sequential(
-            nn.Linear(hidden_size, int(hidden_size/8)*2),
-            nn.ReLU(),
-            nn.Linear(int(hidden_size/8)*2, int(hidden_size/16)),
-            nn.ReLU(),
-            nn.Linear(int(hidden_size/16), 2)
-        )
+        self.sentimentClassifier = nn.Sequential(nn.Dropout(0.2),
+                                                 nn.Linear(hidden_size, 2)
+                                                 )
+        # self.sentimentClassifier =  nn.Sequential(
+        #     nn.Linear(hidden_size, int(hidden_size/8)*2),
+        #     nn.ReLU(),
+        #     nn.Linear(int(hidden_size/8)*2, int(hidden_size/16)),
+        #     nn.ReLU(),
+        #     nn.Linear(int(hidden_size/16), 2)
+        # )
 
     def __dist__(self, x, y, dim):
         if self.dot:

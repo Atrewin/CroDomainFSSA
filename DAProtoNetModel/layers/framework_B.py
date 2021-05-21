@@ -174,7 +174,7 @@ class SentimentFramework:
                 {'params': [p for n, p in parameters_to_optimize
                             if (not any(nd in n for nd in no_decay)) and (not any(low in n for low in low_lr))],'weight_decay': 0.01, 'lr': 1e-4},# bert之外的人应该有更多的学习率
                 {'params': [p for n, p in parameters_to_optimize
-                            if any(nd in n for nd in no_decay) and (not any(low in n for low in low_lr))], 'weight_decay': 0.0, 'lr': 1e-4}
+                            if any(nd in n for nd in no_decay) and (not any(low in n for low in low_lr))], 'weight_decay': 0.0, 'lr': 1e-4}# bert 和 后面的MLP的学习率差异不能太大
             ]
             ###
 
@@ -187,10 +187,25 @@ class SentimentFramework:
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
                                                         num_training_steps=train_iter)
         else:
-            optimizer = pytorch_optim(model.parameters(), learning_rate, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
 
-        optimizer_sen_dis = pytorch_optim(self.sen_d.parameters(), lr=adv_dis_lr)
+            # logger.info('Use cnn optim!')
+            # parameters_to_optimize = list(model.named_parameters())  # 变量格式? tuple(name: str,param: contain)
+            #
+            # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+            # # @jinhui 疑问点: 这里为什么要这样设置leanable parameters weight_decay
+            # parameters_to_optimize = [
+            #     {'params': [p for n, p in parameters_to_optimize
+            #                 if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+            #     {'params': [p for n, p in parameters_to_optimize
+            #                 if any(nd in n for nd in no_decay)], 'weight_decay': 0.0001}
+            # ]
+            # optimizer = AdamW(parameters_to_optimize, lr=learning_rate, correct_bias=False)
+            # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step,
+            #                                             num_training_steps=train_iter)
+            optimizer = pytorch_optim(model.parameters(), learning_rate*10, weight_decay=weight_decay)
+            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)#下面的优化器不会动
+
+        # optimizer_sen_dis = pytorch_optim(self.sen_d.parameters(), lr=adv_dis_lr)
         if load_ckpt:
             load_ckpt = save_ckpt
             state_dict = self.__load_model__(load_ckpt)['state_dict']
@@ -232,7 +247,8 @@ class SentimentFramework:
                 query = None
                 if torch.cuda.is_available():
                     support["word"] = support["word"].cuda()
-                    label = support_label.cuda()# @改
+                    support["attention_mask"] = support["attention_mask"].cuda()
+                    label = support_label.cuda() # @jinhui 改
                 logits, pred = model(support, query, N_for_train, K,  Q * N_for_train + na_rate * Q)  # 是只用support
 
                 loss = model.loss(logits, label) / float(grad_iter)#改
@@ -241,17 +257,17 @@ class SentimentFramework:
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    # torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 10)
+
                 else:
-                    # sum_loss = loss
-                    loss.backward(retain_graph=True)
+
+                    loss.backward()
 
                 it += 1
                 # if it % grad_iter == 0:  # @jinhui 貌似这个就是用来累计梯度的
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-                torch.cuda.empty_cache()
+
 
                 iter_loss += self.item(loss.data)
                 iter_right += self.item(right.data)
@@ -353,6 +369,7 @@ class SentimentFramework:
                     query  = None
                     if torch.cuda.is_available():
                         support["word"] = support["word"].cuda()
+                        support["attention_mask"] = support["attention_mask"].cuda()
                         label = support_label.cuda()
                     logits, pred = model(support, query, N, K, Q * N + Q * na_rate)# 是只用support
 

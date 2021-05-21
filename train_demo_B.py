@@ -108,7 +108,22 @@ def main():
         pretrain_ckpt = opt.pretrain_ckpt or 'bert-base-uncased'
         max_length = opt.max_length
         sentence_encoder = BERTSentenceEncoder(pretrain_ckpt, max_length, cat_entity_rep=opt.cat_entity_rep, mask_entity=opt.mask_entity)
-
+    elif encoder_name == 'cnn':
+        try:
+            glove_mat = np.load('./pretrain/glove/glove_mat.npy')
+            glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
+        except:
+            raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
+        max_length = opt.max_length
+        sentence_encoder = CNNSentenceEncoder(glove_mat, glove_word2id, max_length,hidden_size=opt.hidden_size)
+    elif encoder_name == "lstn":
+        try:
+            glove_mat = np.load('./pretrain/glove/glove_mat.npy')
+            glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
+        except:
+            raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
+        max_length = opt.max_length
+        sentence_encoder = LSTMSentenceEncoder(glove_mat, glove_word2id, max_length,hidden_size=opt.hidden_size)
 
     model = DAPostBertNet(sentence_encoder, opt.hidden_size, dot=opt.dot)#改
 

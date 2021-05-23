@@ -244,11 +244,11 @@ def main():
     # 预处理 和 抽取文本的entities都封装到reviews2json内部因为entities的时候还需要使用到标点符号的分割
     # 将reviews转换成json结构 //包含tokens化；get entities
     json_data = reviews2json(pos_reviews, neg_reviews)
-    # unlabeled_json_data = unlabeledReviews2json(unlabeled_reviews)
+    unlabeled_json_data = unlabeledReviews2json(unlabeled_reviews)
 
     # 保存数据
     json_util.dump(json_data, keep_url)
-    # json_util.dump(unlabeled_json_data, unlabeled_keep_url)
+    json_util.dump(unlabeled_json_data, unlabeled_keep_url)
 
 
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ if __name__ == '__main__':
                         help="domain name")
     opt = parser.parse_args()
 
-    print ('Extracting seed concepts from all domains.')
+    print ('Extracting seed concepts from ' + opt.domain)
 
     domainList = [opt.domain]# , "books", "dvd"，"electronics", "kitchen" 用于控制从大图中抽取什么样的节点作为
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     print ('Num seed concepts:', len(all_seeds))
     print ('Populating domain aggregated sub-graph with seed concept sub-graphs.')
     triplets, unique_nodes_mapping = domain_aggregated_graph(all_seeds, G, G_reverse, concept_map, relation_map)# @jinhui 这边是全部dataset的吗？这个只是做为一个快速找到邻居的工具
-    # unique_nodes_mapping 80908 其实是过滤掉一些all_seeds无关的，将index缩短 triplets中的是压缩过的{conceptMap：coutureindex}
+    # unique_nodes_mapping 80908 其实是过滤掉一些all_seeds无关的，将index缩短 triplets中的是压缩过的 {conceptMap：coutureindex}
     print ('Creating sub-graph for seed concepts.')
     concept_graphs = {}# 每个seed 一个graph是为什么？在总图中把相关的东西都筛选出来
 
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     for item in inv_unique_nodes_mapping:
         inv_word_index[item] = inv_concept_map[inv_unique_nodes_mapping[item]]# index 是 小图的
     word_index = {v: k for k, v in inv_word_index.items()}
-        
+    inv_relation_map = {v: k for k, v in relation_map.items()}
     print ('Saving files.')
     fileName = ""
     for domain in domainList:
@@ -68,6 +68,8 @@ if __name__ == '__main__':
     pickle.dump(unique_nodes_mapping, open(fileName + '/unique_nodes_mapping.pkl', 'wb'))# 大图index到小图index
     pickle.dump(word_index, open(fileName + '/word_index.pkl', 'wb'))
     # pickle.dump(concept_graphs, open(fileName + '/concept_graphs.pkl', 'wb'))#每个concept的独立子图，就是多了成索引
-    
+
     np.ndarray.dump(triplets, open(fileName + '/triplets.np', 'wb'))        #过滤后的concept的子图index
     print ('Completed.')
+
+

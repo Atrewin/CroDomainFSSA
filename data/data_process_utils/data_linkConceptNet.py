@@ -140,8 +140,7 @@ if __name__ == '__main__':
                         help="data_json_dir")
     parser.add_argument("--start", default=0,
                         help="beginIndex")
-    parser.add_argument("--end", default=2000,
-                        help="endIndex")
+
     opt = parser.parse_args()
 
     # 统一获取后分配的方案
@@ -167,7 +166,6 @@ if __name__ == '__main__':
     print("total " + len(allConcepts) + "concepts")
 
     start = opt.start
-    end = opt.end
     end = len(allConcepts)
     saveSetp = 500
 
@@ -187,11 +185,11 @@ if __name__ == '__main__':
 
 
 
-    print("完成获取concept"+ str(start) + "-" + str(end) + "的获取")
+    print("completed concept"+ str(start) + "-" + str(end) + "extraction")
 
     # TODO 回写到reviewJosnData
     urlList = getDomainDataURL(domainList)
-    # 不用把，这个只是一个技巧文件，原则上不需要
+
     for url in urlList:
         addConceptNetTriple2JsonData(url)
 

@@ -255,11 +255,5 @@ if __name__ == '__main__':
             
     model.eval()
 
-    # for domain in ['books', 'dvd', 'electronics', 'kitchen']:
-    #     print ('Extracting features for', domain)
-    #     for split in ['test', 'small']:
-    #         sf = sentence_features(model, domain, split, all_seeds, concept_graphs, relation_map, unique_nodes_mapping)
-    #         np.ndarray.dump(sf, open('../../data/graph_features/sf_' + domain + '_' + split + '_5000.np', 'wb'))
-
     print ('Done.')
     

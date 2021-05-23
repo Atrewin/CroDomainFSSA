@@ -68,7 +68,7 @@ def main():
     parser.add_argument('--start_train_adv', default=500000, type=int, help="iter to start add adv")
     parser.add_argument('--start_train_dis', default=-1, type=int, help='iter to start train discriminator.')
     parser.add_argument('--is_old_graph_feature', default=0, type=int, help='1 if old graph feature ')
-    parser.add_argument('--ignore_graph_feature', default=0, type=int, help='1 if ignore graph feature ')
+    parser.add_argument('--ignore_graph_feature', default=0, type=int, help='1 if ignore graph feature ')# 这个应该是
     parser.add_argument('--ignore_bert_feature', default=0, type=int, help='1 if ignore bert feature ')
 
 
@@ -151,10 +151,10 @@ def main():
     val_data_loader = get_loader(opt.val, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     test_data_loader = get_loader(opt.test, sentence_encoder, N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, opt=opt)
     if opt.adv:
-        # adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-        adv_data_loader = None
+        adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder, N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
     else:
         adv_data_loader = None
+
     if opt.optim == 'sgd':
         pytorch_optim = optim.SGD
     elif opt.optim == 'adam':
@@ -164,14 +164,12 @@ def main():
         pytorch_optim = AdamW
     else:
         raise NotImplementedError
+
     # 领域二分类器
     d = Discriminator(opt.hidden_size)
     sen_D = Sen_Discriminator(opt.hidden_size)# 是这里开始变慢了？
     sen_sp_D = Sen_Discriminator_sp(opt.hidden_size)
     framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader, adv_data_loader=adv_data_loader, adv=opt.adv, d=d, sen_d=sen_D, sen_sp_D=sen_sp_D)
-
-
-
 
     if not os.path.exists('checkpoint'):
         os.mkdir('checkpoint')
@@ -181,7 +179,7 @@ def main():
 
     if torch.cuda.is_available():
         model.cuda()# 疑问 这一句有成功tocuda吗？
-
+    #TODO forward model
     if not opt.only_test:
         if encoder_name in ['bert', 'roberta', "roberta_newGraph","bert_newGraph"]:
             bert_optim = True
@@ -199,7 +197,6 @@ def main():
                 na_rate=opt.na_rate, val_step=opt.val_step, fp16=opt.fp16,
                 train_iter=opt.train_iter, val_iter=opt.val_iter, bert_optim=bert_optim,
                 learning_rate=opt.lr, use_sgd_for_bert=opt.use_sgd_for_bert, opt=opt)
-
 
     elif not opt.visualization:
         ckpt = opt.load_ckpt

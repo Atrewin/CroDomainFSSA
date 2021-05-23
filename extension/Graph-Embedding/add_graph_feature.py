@@ -223,7 +223,7 @@ if __name__ == '__main__':
     all_seeds = pickle.load(open(fileName + '/all_seeds.pkl', 'rb'))
     relation_map = pickle.load(open(fileName + '/relation_map.pkl', 'rb'))
     unique_nodes_mapping = pickle.load(open(fileName + '/unique_nodes_mapping.pkl', 'rb'))  # node_index2int_id
-    # concept_graphs = pickle.load(open(fileName + '/concept_graphs.pkl', 'rb'))
+
 
     model = RGCN(len(unique_nodes_mapping), len(relation_map), num_bases=n_bases, dropout=dropout).cuda()
     epoch = 950

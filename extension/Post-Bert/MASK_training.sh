@@ -12,14 +12,12 @@ MAX_EPOCH=500           # update epochs
 SAVE_INTERVAL=50
 # 三个会随着domain_A --> domain_B 变化的参数
 domains=book2dvd
-
 DATA_DIR=data/domain_data/data-bin/${domains}/mask
-# /home/cike/project/fairseq/extension/RoBERT/pre-train/roberta.base/model.pt
-ROBERTA_PATH=/home/cike/project/fairseq/extension/RoBERT/pre-train/roberta.base/model.pt #取到上一个训练的模式
+
+
 SAVE_PATH=checkpoints/MASK_${domains}                       # 不知道为什么，无法设置 @jinhui 0315 因为做了代换为 --save-dir 而不是看到的--save_dir
 
 CUDA_VISIBLE_DEVICES=3 fairseq-train --fp16 $DATA_DIR \
-    --restore-file $ROBERTA_PATH \
     --save-dir $SAVE_PATH \
     --save-interval $SAVE_INTERVAL \
     --task masked_lm --criterion masked_lm \
@@ -33,7 +31,5 @@ CUDA_VISIBLE_DEVICES=3 fairseq-train --fp16 $DATA_DIR \
     --max-epoch $MAX_EPOCH \
     --reset-optimizer --reset-dataloader --reset-meters \
 
-# 问题记录
-# 它会过掉restore中对于的参数，估计是load_model(dict)中是按键值赋值的
-# "(0.9, 0.98)" 是传不进去的， 我在源代码做了(0.9, 0.98)的规定（规定赋值）
+
 

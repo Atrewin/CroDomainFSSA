@@ -3,6 +3,7 @@ import sys
 from os.path import normpath,join,dirname
 sys.path.append(normpath(join(dirname(__file__), '..')))
 
+from utils.path_util import from_project_root
 
 import os
 import random
@@ -209,10 +210,9 @@ def process2DSP(opt):
 
 
 def process2MASK(opt):
-    source_unlabeled_xml_url = opt.source_unlabeled_xml_url
-    target_unlabeled_xml_url = opt.target_unlabeled_xml_url
-
-    sentence_pair_keep_url = opt.sentence_pair_keep_url
+    source_unlabeled_xml_url = from_project_root(opt.source_unlabeled_xml_url)
+    target_unlabeled_xml_url = from_project_root(opt.target_unlabeled_xml_url)
+    sentence_pair_keep_url = from_project_root(opt.sentence_pair_keep_url)
 
     # 从xml文件中抽取具体的reviews, return: 数组 array
     source_unlabeled_reviews = sentence_extractor(source_unlabeled_xml_url)

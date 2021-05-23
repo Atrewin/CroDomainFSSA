@@ -43,14 +43,7 @@ def date_suffix(file_type=""):
 
 
 def main():
-    """ for test """
-    print(project_root_url)
-    print(from_project_root('.gitignore'))
-    print(from_project_root('data/test.py', create=False))
-    print(date_suffix('.csv'))
-    print(date_suffix(""))
     pass
-
 
 if __name__ == '__main__':
     main()

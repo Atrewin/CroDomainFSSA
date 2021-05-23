@@ -76,6 +76,7 @@ if __name__ == '__main__':
         pass
 
         # 加入10条备用边
+
         for i in range(10):
             f.write("conceptA")
             f.write('\t')
